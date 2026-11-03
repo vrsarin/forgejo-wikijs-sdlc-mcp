@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /src/forgejo-mcp-server
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /src/wikijs-sdlc-mcp-server
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /src/homeassistant-mcp-server
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /src/forgejo-mcp-server
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /src/wikijs-sdlc-mcp-server
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /src/homeassistant-mcp-server
+    schedule:
+      interval: weekly

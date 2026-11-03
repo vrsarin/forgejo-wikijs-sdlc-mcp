@@ -10,6 +10,23 @@
 *.userosscache
 *.sln.docstates
 *.env
+.env
+.sdlc-runtime
+.sdlc-local-ca.pem
+.sdlc-local-ca-trust.json
+.sdlc-local-ca-trust.json.*.tmp
+
+# Node.js / TypeScript
+node_modules/
+coverage/
+dist/
+.turbo/
+.eslintcache
+*.tsbuildinfo
+
+# Local development overrides and data
+compose.override.yaml
+docker-compose.override.yml
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -409,6 +426,7 @@ FodyWeavers.xsd
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+!.vscode/mcp.json
 !.vscode/*.code-snippets
 
 # Local History for Visual Studio Code
@@ -426,3 +444,21 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+!/README.md
+!/SECURITY.md
+!/CONTRIBUTING.md
+!/AGENTS.md
+!/CLAUDE.md
+!/.agents/
+!/.agents/skills/
+!/.agents/skills/**
+!/.claude/
+!/.claude/skills/
+!/.claude/skills/**
+!/.github/CODE_OF_CONDUCT.md
+!/.github/copilot-instructions.md
+!/.github/PULL_REQUEST_TEMPLATE.md
+!/docs/deployment-security.md
+!/docs/streamable-http.md
+!/docs/documentation.md

@@ -1,0 +1,13 @@
+**
+!src/
+!src/forgejo-mcp-server/
+!src/forgejo-mcp-server/package.json
+!src/forgejo-mcp-server/package-lock.json
+!src/forgejo-mcp-server/tsconfig.json
+!src/forgejo-mcp-server/src/
+!src/forgejo-mcp-server/src/**
+!src/shared/
+!src/shared/acme-entrypoint.sh
+!src/shared/discovery-access.ts
+!src/shared/login-flow.ts
+!src/shared/tls-http.ts

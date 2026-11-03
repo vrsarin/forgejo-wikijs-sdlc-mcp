@@ -1,0 +1,10 @@
+# Default owner and required reviewer for repository changes
+
+- @vrsarin
+
+## Security-sensitive surfaces
+
+/.github/ @vrsarin
+/src/shared/ @vrsarin
+/docs/deployment-security.md @vrsarin
+/SECURITY.md @vrsarin

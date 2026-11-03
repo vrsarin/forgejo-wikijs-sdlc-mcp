@@ -1,0 +1,22 @@
+{
+  "name": "@vrsarin/homeassistant-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "jose": "6.1.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "esbuild": "0.28.2",
+    "typescript": "6.0.2"
+  },
+  "scripts": {
+    "check": "node --check src/app.mjs && node --check src/auth.mjs && node --check src/index.mjs && node --check src/test-upstream-tls.mjs && node --check ../shared/homeassistant-oauth.mjs",
+    "build": "npm run check",
+    "test": "node --test test/*.test.mjs"
+  }
+}

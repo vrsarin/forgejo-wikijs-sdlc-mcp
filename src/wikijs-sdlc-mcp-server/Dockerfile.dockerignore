@@ -1,0 +1,13 @@
+**
+!src/
+!src/wikijs-sdlc-mcp-server/
+!src/wikijs-sdlc-mcp-server/package.json
+!src/wikijs-sdlc-mcp-server/package-lock.json
+!src/wikijs-sdlc-mcp-server/tsconfig.json
+!src/wikijs-sdlc-mcp-server/src/
+!src/wikijs-sdlc-mcp-server/src/**
+!src/shared/
+!src/shared/acme-entrypoint.sh
+!src/shared/discovery-access.ts
+!src/shared/login-flow.ts
+!src/shared/tls-http.ts

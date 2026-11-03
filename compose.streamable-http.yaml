@@ -1,0 +1,116 @@
+name: sdlc-mcp-streamable-http
+
+x-mcp-runtime: &mcp-runtime
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 100
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m
+  restart: unless-stopped
+
+services:
+  forgejo-mcp:
+    <<: *mcp-runtime
+    profiles: [forgejo]
+    image: ${FORGEJO_MCP_IMAGE:-forgejo-workflow-mcp:dev}
+    build:
+      context: .
+      dockerfile: src/forgejo-mcp-server/Dockerfile
+    environment:
+      MCP_TRANSPORT: http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 3000
+      MCP_ALLOWED_HOSTS: ${FORGEJO_MCP_ALLOWED_HOSTS:-localhost,127.0.0.1,forgejo-mcp}
+      MCP_ALLOWED_ORIGINS: ${FORGEJO_MCP_ALLOWED_ORIGINS:-}
+      ENABLE_OIDC: ${ENABLE_OIDC:-false}
+      ENABLE_TLS: ${ENABLE_TLS:-false}
+      MCP_OIDC_ISSUER: ${MCP_OIDC_ISSUER:-}
+      MCP_OIDC_RESOURCE: ${FORGEJO_MCP_PUBLIC_URL:-http://127.0.0.1:3010/mcp}
+      MCP_OIDC_AUDIENCE: ${FORGEJO_MCP_OIDC_AUDIENCE:-}
+      MCP_OIDC_REQUIRED_REALM_ROLE: ${MCP_OIDC_REQUIRED_REALM_ROLE:-mcp-user}
+      FORGEJO_URL: ${FORGEJO_URL:-http://host.docker.internal:3000}
+      FORGEJO_ALLOW_INSECURE_HTTP: ${FORGEJO_ALLOW_INSECURE_HTTP:-true}
+      SDLC_ALLOWED_REPOSITORIES: ${SDLC_ALLOWED_REPOSITORIES:-owner/repository}
+      SDLC_ENABLE_WRITES: ${SDLC_ENABLE_WRITES:-false}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - 127.0.0.1:${FORGEJO_MCP_PORT:-3010}:3000
+    volumes:
+      - forgejo-mcp-data:/data
+    healthcheck:
+      test: [CMD, node, -e, "require(process.env.ENABLE_TLS==='true'?'https':'http').get((process.env.ENABLE_TLS==='true'?'https':'http')+'://127.0.0.1:3000/healthz',{rejectUnauthorized:false},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  wikijs-sdlc-mcp:
+    <<: *mcp-runtime
+    profiles: [wikijs]
+    image: ${WIKIJS_SDLC_MCP_IMAGE:-wikijs-sdlc-mcp:dev}
+    build:
+      context: .
+      dockerfile: src/wikijs-sdlc-mcp-server/Dockerfile
+    environment:
+      MCP_TRANSPORT: http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 3000
+      MCP_ALLOWED_HOSTS: ${WIKIJS_MCP_ALLOWED_HOSTS:-localhost,127.0.0.1,wikijs-sdlc-mcp}
+      MCP_ALLOWED_ORIGINS: ${WIKIJS_MCP_ALLOWED_ORIGINS:-}
+      ENABLE_OIDC: ${ENABLE_OIDC:-false}
+      ENABLE_TLS: ${ENABLE_TLS:-false}
+      MCP_OIDC_ISSUER: ${MCP_OIDC_ISSUER:-}
+      MCP_OIDC_RESOURCE: ${WIKIJS_MCP_PUBLIC_URL:-http://127.0.0.1:3011/mcp}
+      MCP_OIDC_AUDIENCE: ${WIKIJS_MCP_OIDC_AUDIENCE:-}
+      MCP_OIDC_REQUIRED_REALM_ROLE: ${MCP_OIDC_REQUIRED_REALM_ROLE:-mcp-user}
+      WIKIJS_MCP_URL: ${WIKIJS_MCP_URL:-http://host.docker.internal:3001/_mcp}
+      WIKIJS_ALLOW_INSECURE_MCP_HTTP: ${WIKIJS_ALLOW_INSECURE_MCP_HTTP:-true}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - 127.0.0.1:${WIKIJS_MCP_PORT:-3011}:3000
+    volumes:
+      - wikijs-mcp-data:/data
+    healthcheck:
+      test: [CMD, node, -e, "require(process.env.ENABLE_TLS==='true'?'https':'http').get((process.env.ENABLE_TLS==='true'?'https':'http')+'://127.0.0.1:3000/healthz',{rejectUnauthorized:false},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  homeassistant-mcp:
+    <<: *mcp-runtime
+    profiles: [homeassistant]
+    image: ${HOMEASSISTANT_MCP_IMAGE:-homeassistant-mcp:dev}
+    build:
+      context: .
+      dockerfile: src/homeassistant-mcp-server/Dockerfile
+    environment:
+      MCP_PORT: 3000
+      ENABLE_TLS: ${ENABLE_TLS:-false}
+      MCP_OIDC_ISSUER: ${MCP_OIDC_ISSUER:-}
+      MCP_OIDC_AUDIENCE: ${HOMEASSISTANT_MCP_OIDC_AUDIENCE:-}
+      HOMEASSISTANT_PUBLIC_URL: ${HOMEASSISTANT_PUBLIC_URL:-}
+      HOMEASSISTANT_INTERNAL_URL: ${HOMEASSISTANT_INTERNAL_URL:-https://home-assistant-upstream-tls}
+      HOMEASSISTANT_DISCOVERY_SUBJECT_FILE: /run/secrets/homeassistant-discovery-subject
+      HOMEASSISTANT_TOKEN_ENCRYPTION_KEY: ${HOMEASSISTANT_TOKEN_ENCRYPTION_KEY:-}
+    ports:
+      - 127.0.0.1:${HOMEASSISTANT_MCP_PORT:-3012}:3000
+    volumes:
+      - homeassistant-mcp-data:/data
+      - ${HOMEASSISTANT_DISCOVERY_SUBJECT_FILE_HOST:-./.data/homeassistant-discovery.id}:/run/secrets/homeassistant-discovery-subject:ro
+    healthcheck:
+      test: [CMD, node, -e, "require(process.env.ENABLE_TLS==='true'?'https':'http').get((process.env.ENABLE_TLS==='true'?'https':'http')+'://127.0.0.1:3000/healthz',{rejectUnauthorized:false},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  forgejo-mcp-data:
+  wikijs-mcp-data:
+  homeassistant-mcp-data:

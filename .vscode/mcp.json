@@ -1,0 +1,74 @@
+{
+  "servers": {
+    "forgejo-workflow": {
+      "type": "http",
+      "url": "http://127.0.0.1:3010/mcp"
+    },
+    "wikijs-sdlc": {
+      "type": "http",
+      "url": "http://127.0.0.1:3011/mcp"
+    },
+    "home-assistant": {
+      "type": "http",
+      "url": "http://127.0.0.1:3012/mcp"
+    },
+    "forgejo-workflow-stdio": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/src/forgejo-mcp-server/dist/index.js"
+      ],
+      "env": {
+        "MCP_TRANSPORT": "stdio",
+        "FORGEJO_URL": "${input:forgejoUrl}",
+        "FORGEJO_ACCESS_TOKEN": "${input:forgejoAccessToken}",
+        "SDLC_ALLOWED_REPOSITORIES": "${input:forgejoAllowedRepositories}",
+        "SDLC_ENABLE_WRITES": "false"
+      }
+    },
+    "wikijs-sdlc-stdio": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/src/wikijs-sdlc-mcp-server/dist/index.js"
+      ],
+      "env": {
+        "MCP_TRANSPORT": "stdio",
+        "WIKIJS_MCP_URL": "${input:wikijsMcpUrl}",
+        "WIKIJS_ACCESS_TOKEN": "${input:wikijsAccessToken}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "id": "forgejoUrl",
+      "type": "promptString",
+      "description": "Forgejo origin",
+      "default": "http://127.0.0.1:3000"
+    },
+    {
+      "id": "forgejoAccessToken",
+      "type": "promptString",
+      "description": "Read-only Forgejo access token",
+      "password": true
+    },
+    {
+      "id": "forgejoAllowedRepositories",
+      "type": "promptString",
+      "description": "Comma-separated Forgejo owner/repository allowlist",
+      "default": "owner/repository"
+    },
+    {
+      "id": "wikijsMcpUrl",
+      "type": "promptString",
+      "description": "Wiki.js official MCP endpoint",
+      "default": "http://127.0.0.1:3001/_mcp"
+    },
+    {
+      "id": "wikijsAccessToken",
+      "type": "promptString",
+      "description": "Read-only Wiki.js access token",
+      "password": true
+    }
+  ]
+}
