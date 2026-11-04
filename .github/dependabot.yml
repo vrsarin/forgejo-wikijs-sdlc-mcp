@@ -6,6 +6,8 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 10
+    commit-message:
+      prefix: "ci(deps)"
     groups:
       github-actions:
         patterns: ["*"]
@@ -13,7 +15,18 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "build(deps)"
+    ignore:
+      # typescript-eslint supports TypeScript below 6.1 only.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # Match the Node.js 22 engine floor and runtime.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "build(deps)"

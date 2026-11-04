@@ -2,7 +2,7 @@ name: Repository security
 
 on:
   push:
-    branches: [main, feature/**]
+    branches: [main, "release/**", "feature/**", "bug/**", "hotfix/**"]
   pull_request:
     branches: [main, "release/**"]
   schedule:

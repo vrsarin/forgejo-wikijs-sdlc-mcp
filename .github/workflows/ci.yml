@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, feature/**]
+    branches: [main, "release/**", "feature/**", "bug/**", "hotfix/**"]
   pull_request:
     branches: [main, "release/**"]
   workflow_dispatch:
@@ -76,3 +76,6 @@ jobs:
           file: cobertura-coverage.xml
           language: JavaScript
           label: code-coverage/c8
+          # Code Quality must be enabled in the repository settings first;
+          # remove this once uploads succeed.
+          fail-on-error: false

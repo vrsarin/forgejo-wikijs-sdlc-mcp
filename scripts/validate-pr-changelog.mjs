@@ -80,6 +80,15 @@ export function validatePullRequest({ title = '', body = '' }) {
   return errors
 }
 
+export function isTrustedDependencyBot(pullRequest) {
+  return (
+    pullRequest?.user?.login === 'dependabot[bot]' &&
+    pullRequest.head?.repo?.full_name !== undefined &&
+    pullRequest.head.repo.full_name === pullRequest.base?.repo?.full_name &&
+    /^dependabot\//.test(pullRequest.head.ref ?? '')
+  )
+}
+
 function escapeWorkflowCommand(value) {
   return value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')
 }
@@ -97,6 +106,10 @@ function main() {
     const event = JSON.parse(readFileSync(eventPath, 'utf8'))
     const pullRequest = event.pull_request
     if (!pullRequest) throw new Error('The CI event does not contain a pull request')
+    if (isTrustedDependencyBot(pullRequest)) {
+      console.log('Pull request changelog requirements: SKIPPED for a same-repository Dependabot update')
+      return
+    }
     title = pullRequest.title ?? ''
     body = pullRequest.body ?? ''
   }

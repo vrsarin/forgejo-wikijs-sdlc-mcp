@@ -19,7 +19,7 @@ on:
       - "src/providers/wikijs/**"
       - "src/providers/homeassistant/**"
   push:
-    branches: ["**"]
+    branches: ["**", "!dependabot/**"]
     paths:
       - ".github/workflows/container-images.yml"
       - ".github/actions/setup-pinned-trivy/action.yml"
