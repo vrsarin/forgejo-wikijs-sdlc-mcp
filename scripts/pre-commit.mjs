@@ -18,7 +18,7 @@ const checks = [
   { name: 'Lint', command: 'npm', args: ['run', 'lint'] },
   { name: 'Dependency audit', command: 'make', args: ['audit'] },
   { name: 'Type and syntax checks', command: 'make', args: ['check'] },
-  { name: 'Tests', command: 'make', args: ['test'] },
+  { name: 'Tests and coverage', command: 'make', args: ['coverage'] },
   { name: 'Compose validation', command: 'make', args: ['compose-check'] },
   { name: 'Container builds', command: 'make', args: ['images'] },
   { name: 'Repository vulnerability and configuration scan', command: 'make', args: ['trivy-fs'] },

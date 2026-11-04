@@ -1,4 +1,4 @@
-.PHONY: install lint audit build check test images compose-check verify test-security trivy-fs trivy-secrets trivy-images sbom pre-commit
+.PHONY: install lint audit build check test coverage images compose-check verify test-security trivy-fs trivy-secrets trivy-images sbom pre-commit
 
 PACKAGES := src/forgejo-mcp-server src/wikijs-sdlc-mcp-server src/homeassistant-mcp-server
 IMAGES := forgejo-workflow-mcp:dev wikijs-sdlc-mcp:dev homeassistant-mcp:dev
@@ -27,6 +27,9 @@ test:
 	@for package in $(PACKAGES); do npm --prefix $$package test || exit 1; done
 	node --test src/shared/homeassistant-oauth.test.mjs
 	node --test scripts/*.test.mjs
+
+coverage:
+	npm run coverage
 
 images:
 	docker build -f src/forgejo-mcp-server/Dockerfile -t forgejo-workflow-mcp:dev .
@@ -57,4 +60,4 @@ test-security: trivy-fs trivy-secrets trivy-images sbom
 pre-commit:
 	npm run precommit
 
-verify: lint audit check test compose-check
+verify: lint audit check coverage compose-check

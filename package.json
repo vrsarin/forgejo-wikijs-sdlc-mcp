@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "coverage": "c8 make test",
     "lint": "eslint .",
     "precommit": "node scripts/pre-commit.mjs",
     "pr:changelog": "node scripts/validate-pr-changelog.mjs",
@@ -12,12 +13,14 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "c8": "12.0.0",
     "eslint": "10.14.0",
     "globals": "17.14.0",
     "husky": "9.1.7",
     "typescript-eslint": "8.72.1"
   },
   "overrides": {
+    "glob": "14.0.3",
     "minimatch": "11.0.1"
   }
 }

@@ -1,0 +1,18 @@
+{
+  "all": true,
+  "include": [
+    "src/**/src/**/*.{ts,mjs}",
+    "src/shared/*.{ts,mjs}"
+  ],
+  "exclude": [
+    "src/**/src/index.*",
+    "**/*.test.*"
+  ],
+  "reporter": [
+    "text",
+    "cobertura"
+  ],
+  "reports-dir": ".coverage",
+  "check-coverage": true,
+  "lines": 80
+}
