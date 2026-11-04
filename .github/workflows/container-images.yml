@@ -322,3 +322,10 @@ jobs:
           subject-name: ${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+      - name: Remove superseded package versions
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_NAME: ${{ matrix.image }}
+          PACKAGE_OWNER: ${{ github.repository_owner }}
+        run: node scripts/package-retention.mjs --apply
