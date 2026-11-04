@@ -42,7 +42,14 @@ test('rejects an unencrypted Home Assistant OAuth upstream', () => {
   assert.throws(() => new ProviderOAuth({
     publicUrl: 'https://home.localhost/', internalUrl: 'http://home-assistant:8123/',
     callbackUrl: 'http://localhost/oauth/homeassistant/callback', issuer, store: store()
-  }), /Invalid local Home Assistant OAuth endpoint/)
+  }), /Invalid Home Assistant OAuth endpoint/)
+})
+
+test('accepts an HTTPS Home Assistant public URL outside localhost', () => {
+  assert.doesNotThrow(() => new ProviderOAuth({
+    publicUrl: 'https://home.example/', internalUrl: 'https://home-assistant-upstream-tls/',
+    callbackUrl: 'http://localhost/oauth/homeassistant/callback', issuer, store: store()
+  }))
 })
 
 test('PKCE connection binds the Home Assistant grant to the verified Keycloak subject', async () => {

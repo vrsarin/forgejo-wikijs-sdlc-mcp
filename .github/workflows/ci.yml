@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, feature/base_setup]
   pull_request:
-    branches: [main]
+    branches: [main, "release/**"]
   workflow_dispatch:
 
 concurrency:
@@ -53,6 +53,9 @@ jobs:
 
   coverage:
     name: Upload coverage
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.base_ref == 'main')
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 10

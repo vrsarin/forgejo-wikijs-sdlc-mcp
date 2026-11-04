@@ -156,7 +156,7 @@ test('tools use the stored grant for the verified user and never another user\'s
   const tools = (createWikiJsSdlcServer(new URL('http://wiki.localhost/_mcp'), client, oauth) as unknown as { _registeredTools: Record<string, { handler: (context: unknown) => Promise<{ content: Array<{ text: string }> }> }> })._registeredTools
   const as = (subject: string) => ({ http: { req: new Request('http://x/mcp'), authInfo: { clientId: subject, extra: { subject } } } })
   await tools.discover_wikijs_capabilities!.handler(as('alice'))
-  assert.deepEqual(seen, ['Bearer a1', 'Bearer a1'])
+  assert.deepEqual(seen, ['Bearer a1', 'Bearer a1', 'Bearer a1'])
   await assert.rejects(() => tools.discover_wikijs_capabilities!.handler(as('bob')), /connect_wikijs/)
   const link = JSON.parse((await tools.connect_wikijs!.handler(as('bob'))).content[0]!.text)
   assert.match(link.authorizeUrl, /^http:\/\/localhost\/oauth\/wikijs\/start\?state=/)
@@ -204,7 +204,7 @@ test('URL elicitation completes the original call after approval, and falls back
     return { action: 'accept' }
   } } }
   await tools.discover_wikijs_capabilities!.handler(approving)
-  assert.deepEqual(seen, ['Bearer a1', 'Bearer a1'])
+  assert.deepEqual(seen, ['Bearer a1', 'Bearer a1', 'Bearer a1'])
   const bob = { http: { req: new Request('http://x/mcp'), authInfo: { clientId: 'bob', extra: { subject: 'bob' } } } }
   const link = /http:\/\/localhost\/oauth\/wikijs\/start\?state=/
   await assert.rejects(() => tools.discover_wikijs_capabilities!.handler({ ...bob, mcpReq: { elicitInput: async () => ({ action: 'decline' }) } }), link)

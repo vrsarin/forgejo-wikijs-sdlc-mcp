@@ -21,13 +21,14 @@ function fixture({ connected = true } = {}) {
     allowedHosts: new Set(['homeassistant-mcp']),
     fetcher: async (_url, options) => {
       const request = JSON.parse(options.body)
-      calls.push({ request, authorization: options.headers.authorization })
+      calls.push({ request, authorization: options.headers.authorization, session: options.headers['mcp-session-id'] })
+      if (request.method === 'initialize') return new Response(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: '2025-06-18' } }), { headers: { 'mcp-session-id': 'ha-session' } })
       if (request.method === 'tools/list') return new Response(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { tools: [{ name: 'HassTurnOn' }] } }))
       return new Response(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { ok: true } }))
     }
   })
-  const request = (token, method, params = {}) => app(new Request('http://homeassistant-mcp/mcp', {
-    method: 'POST', headers: { authorization: `Bearer ${token}` },
+  const request = (token, method, params = {}, session) => app(new Request('http://homeassistant-mcp/mcp', {
+    method: 'POST', headers: { authorization: `Bearer ${token}`, ...(session ? { 'mcp-session-id': session } : {}) },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
   }))
   return { app, request, calls }
@@ -49,6 +50,25 @@ test('normal tool calls use only the authenticated user grant', async () => {
   assert.equal(calls[0].authorization, 'Bearer alice-grant')
   assert.equal((await request('nonmember', 'tools/call', { name: 'HassTurnOn' })).status, 401)
   assert.equal(calls.length, 1)
+})
+
+test('preserves and binds upstream MCP sessions to the authenticated caller', async () => {
+  const { request, calls } = fixture()
+  const initialized = await request('user', 'initialize')
+  assert.equal(initialized.headers.get('mcp-session-id'), 'ha-session')
+  assert.equal((await request('user', 'tools/list', {}, 'ha-session')).status, 200)
+  assert.equal(calls[1].session, 'ha-session')
+  assert.equal((await request('scanner', 'tools/list', {}, 'ha-session')).status, 403)
+})
+
+test('validates managed OAuth tool arguments and rate-limits tool calls', async () => {
+  const { request } = fixture()
+  const invalid = await (await request('user', 'tools/call', { name: 'connect_home_assistant', arguments: { unexpected: true } })).json()
+  assert.equal(invalid.error.code, -32602)
+  for (let index = 0; index < 9; index++) assert.equal((await request('user', 'tools/call', { name: 'HassTurnOn', arguments: {} })).status, 200)
+  const limited = await request('user', 'tools/call', { name: 'HassTurnOn', arguments: {} })
+  assert.equal(limited.status, 429)
+  assert.ok(Number(limited.headers.get('retry-after')) >= 1)
 })
 
 test('missing user grant returns a consent link without using discovery credentials', async () => {

@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { readBounded } from '../../core/read-bounded.js'
 
 /** Forgejo provider implementation used by the shared MCP runtime. */
 
@@ -144,8 +145,10 @@ export class ForgejoClient {
     const response = await (this.#options.fetch ?? globalThis.fetch)(url, { method, redirect: 'error', signal: AbortSignal.timeout(this.#options.requestTimeoutMs ?? 10_000), headers: { accept: 'application/json', authorization: `Bearer ${token}`, ...(body === undefined || isForm ? {} : { 'content-type': 'application/json' }) }, ...(body === undefined ? {} : { body: isForm ? body : JSON.stringify(body) }) })
     const declaredLength = Number(response.headers.get('content-length') ?? 0)
     if (declaredLength > MAX_RESPONSE_BYTES) throw new ForgejoApiError('Forgejo response exceeded the configured limit', response.status, method, path)
-    const text = await response.text()
-    if (Buffer.byteLength(text) > MAX_RESPONSE_BYTES) throw new ForgejoApiError('Forgejo response exceeded the configured limit', response.status, method, path)
+    let text: string
+    try { text = response.body ? (await readBounded(response.body, MAX_RESPONSE_BYTES)).toString('utf8') : '' } catch {
+      throw new ForgejoApiError('Forgejo response exceeded the configured limit', response.status, method, path)
+    }
     if (!response.ok) throw new ForgejoApiError(`Forgejo request failed with HTTP ${response.status}`, response.status, method, path)
     return { response, text }
   }

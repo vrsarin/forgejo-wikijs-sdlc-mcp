@@ -45,12 +45,12 @@ export class ProviderOAuth extends BaseProviderOAuth {
     const publicUrl = new URL(options.publicUrl)
     const internalUrl = new URL(options.internalUrl)
     const redirectUrl = new URL(options.callbackUrl)
-    if (publicUrl.protocol !== 'https:' || !publicUrl.hostname.endsWith('.localhost') || publicUrl.pathname !== '/' ||
+    if (publicUrl.protocol !== 'https:' || publicUrl.pathname !== '/' || publicUrl.username || publicUrl.password || publicUrl.search || publicUrl.hash ||
         internalUrl.origin !== 'https://home-assistant-upstream-tls' || internalUrl.pathname !== '/' ||
         redirectUrl.origin !== 'http://localhost' || redirectUrl.pathname !== oauthPaths(definition).callback ||
         redirectUrl.search || redirectUrl.hash || redirectUrl.username || redirectUrl.password ||
         internalUrl.username || internalUrl.password || internalUrl.search || internalUrl.hash || !text(options.issuer)) {
-      throw new Error('Invalid local Home Assistant OAuth endpoint configuration')
+      throw new Error('Invalid Home Assistant OAuth endpoint configuration')
     }
     super({ redirectUrl, store: options.store, ...(options.fetch ? { fetch: options.fetch } : {}), ...(options.now ? { now: options.now } : {}) })
     this.#publicUrl = publicUrl

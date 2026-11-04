@@ -5,20 +5,27 @@ import { createWikiJsSdlcServer } from '../../../src/providers/wikijs/server.js'
 
 const url = new URL('https://wiki.example/_mcp')
 function client(respond: (body: any, auth: string | null) => Response) {
-  const seen: Array<{ method: string; auth: string | null }> = []
+  const seen: Array<{ method: string; auth: string | null; session: string | null }> = []
   return { seen, client: new WikiJsClient({ mcpUrl: url, fetch: async (_input, init) => {
-    const body = JSON.parse(String(init?.body)); const auth = new Headers(init?.headers).get('authorization')
-    seen.push({ method: body.method, auth }); return respond(body, auth)
+    const body = JSON.parse(String(init?.body)); const headers = new Headers(init?.headers); const auth = headers.get('authorization')
+    seen.push({ method: body.method, auth, session: headers.get('mcp-session-id') }); return respond(body, auth)
   } }) }
 }
-const ok = (body: any) => Response.json({ jsonrpc: '2.0', id: body.id, result: body.method === 'initialize' ? { protocolVersion: '2025-06-18', serverInfo: { name: 'wiki', version: '3' } } : { tools: [{ name: 'search_pages', description: 'Search', extra: 'dropped' }] } })
+const ok = (body: any) => Response.json(
+  { jsonrpc: '2.0', id: body.id, result: body.method === 'initialize' ? { protocolVersion: '2025-06-18', serverInfo: { name: 'wiki', version: '3' } } : { tools: [{ name: 'search_pages', description: 'Search', extra: 'dropped' }] } },
+  body.method === 'initialize' ? { headers: { 'mcp-session-id': 'wiki-session' } } : undefined
+)
 
 test('discovery forwards the caller token and returns the tool list', async () => {
   const { seen, client: wiki } = client((body) => ok(body))
   const found = await wiki.discover('user-token')
   assert.deepEqual(found.tools, [{ name: 'search_pages', description: 'Search' }])
   assert.equal(found.server.name, 'wiki')
-  assert.deepEqual(seen, [{ method: 'initialize', auth: 'Bearer user-token' }, { method: 'tools/list', auth: 'Bearer user-token' }])
+  assert.deepEqual(seen, [
+    { method: 'initialize', auth: 'Bearer user-token', session: null },
+    { method: 'notifications/initialized', auth: 'Bearer user-token', session: 'wiki-session' },
+    { method: 'tools/list', auth: 'Bearer user-token', session: 'wiki-session' }
+  ])
 })
 
 test('each user is discovered with their own token', async () => {

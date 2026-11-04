@@ -11,11 +11,13 @@ import {
 } from '@modelcontextprotocol/server'
 import { OidcJwtVerifier } from './auth.js'
 import type { HttpAuthConfig } from './config.js'
-import { discoveryRequestAllowed } from './discovery-access.js'
+import { DISCOVERY_METHODS, discoveryRequestAllowed } from './discovery-access.js'
 import type { ProviderDefinition } from './provider.js'
 import { createMcpHttpServer, installShutdown, tlsFilesFromEnvironment } from './tls-http.js'
 import { timingSafeStringEqual } from './security.js'
 import { isAllowedHost } from './http-util.js'
+import { enforceRateLimit, FixedWindowRateLimiter } from './rate-limit.js'
+import { readBounded } from './read-bounded.js'
 
 export interface HttpServerOptions {
   host: string
@@ -80,6 +82,7 @@ export async function serveHttp(provider: ProviderDefinition, factory: () => Mcp
     console.error(`WARNING: ${provider.displayName} MCP authentication is disabled; use only in an isolated development environment`)
   }
   const handler = createMcpHandler(factory)
+  const rateLimiter = new FixedWindowRateLimiter()
   const oidc = options.auth.mode === 'oidc' ? options.auth : undefined
   const oidcGate = oidc ? requireBearerAuth({
     verifier: new OidcJwtVerifier(oidc), expectedResource: oidc.resource,
@@ -106,6 +109,19 @@ export async function serveHttp(provider: ProviderDefinition, factory: () => Mcp
       if (new URL(request.url).pathname !== '/mcp') return response(404, 'not found')
       const auth = oidcGate ? await oidcGate(request) : await authorizeRequest(request, options)
       if (auth instanceof Response) return auth
+      let category: 'discovery' | 'tool' | 'other' = 'other'
+      if (request.method === 'POST' && request.body) {
+        try {
+          const body = JSON.parse((await readBounded(request.clone().body, 64 * 1024)).toString('utf8')) as { method?: unknown }
+          if (typeof body?.method === 'string') category = body.method === 'tools/call' ? 'tool' : DISCOVERY_METHODS.has(body.method) ? 'discovery' : 'other'
+        } catch { /* The SDK returns the protocol error for malformed requests. */ }
+      }
+      const identity =
+        typeof auth.extra?.subject === 'string' && auth.extra.subject.length > 0
+          ? auth.extra.subject
+          : auth.clientId
+      const limited = enforceRateLimit(rateLimiter, identity, request.headers.get('mcp-session-id'), category)
+      if (limited) return limited
       if (auth.extra?.discovery === true && !await discoveryRequestAllowed(request)) {
         return response(403, 'Discovery credentials cannot invoke this MCP method')
       }
