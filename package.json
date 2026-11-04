@@ -34,7 +34,7 @@
     "@types/node": "24.10.0",
     "esbuild": "0.28.2",
     "tsx": "4.20.6",
-    "typescript": "6.0.2",
+    "typescript": "7.0.2",
     "typescript-eslint": "8.72.1"
   },
   "overrides": {
