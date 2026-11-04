@@ -1,0 +1,40 @@
+name: Package retention
+
+on:
+  schedule:
+    - cron: "30 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Delete versions selected by the retention plan
+        type: boolean
+        default: false
+
+concurrency:
+  group: package-retention
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  retain:
+    name: Retain release images
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Plan or apply package retention
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_NAME: sdlc-mcp-server
+          PACKAGE_OWNER: ${{ github.repository_owner }}
+          RETENTION_APPLY: ${{ github.event_name == 'schedule' || inputs.apply }}
+        run: node scripts/package-retention.mjs
