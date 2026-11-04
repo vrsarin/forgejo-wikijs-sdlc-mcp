@@ -1,13 +1,11 @@
 .PHONY: install lint audit build check test coverage images compose-check verify test-security trivy-fs trivy-secrets trivy-images sbom pre-commit
 
-PACKAGES := src/forgejo-mcp-server src/wikijs-sdlc-mcp-server src/homeassistant-mcp-server
-IMAGES := forgejo-workflow-mcp:dev wikijs-sdlc-mcp:dev homeassistant-mcp:dev
+IMAGES := sdlc-mcp-server:dev
 TRIVY_IMAGE := aquasec/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
 TRIVY_CACHE := sdlc-mcp-trivy-cache
 
 install:
 	npm ci --ignore-scripts
-	@for package in $(PACKAGES); do npm --prefix $$package ci --ignore-scripts || exit 1; done
 	npm run prepare
 
 lint:
@@ -15,25 +13,21 @@ lint:
 
 audit:
 	npm audit
-	@for package in $(PACKAGES); do npm --prefix $$package audit || exit 1; done
 
 build:
-	@for package in $(PACKAGES); do npm --prefix $$package run build || exit 1; done
+	npm run build
 
 check:
-	@for package in $(PACKAGES); do npm --prefix $$package run check || exit 1; done
+	npm run check
 
 test:
-	@for package in $(PACKAGES); do npm --prefix $$package test || exit 1; done
-	node --test scripts/*.test.mjs
+	npm test
 
 coverage:
 	npm run coverage
 
 images:
-	docker build -f src/forgejo-mcp-server/Dockerfile -t forgejo-workflow-mcp:dev .
-	docker build -f src/wikijs-sdlc-mcp-server/Dockerfile -t wikijs-sdlc-mcp:dev .
-	docker build -f src/homeassistant-mcp-server/Dockerfile -t homeassistant-mcp:dev .
+	docker build -f Dockerfile -t sdlc-mcp-server:dev .
 
 compose-check:
 	docker compose --env-file .env.streamable-http.example -f compose.streamable-http.yaml --profile forgejo --profile wikijs --profile homeassistant config --quiet

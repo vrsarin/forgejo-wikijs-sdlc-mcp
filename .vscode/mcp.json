@@ -16,9 +16,10 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "${workspaceFolder}/src/forgejo-mcp-server/dist/index.js"
+        "${workspaceFolder}/dist/index.js"
       ],
       "env": {
+        "PROVIDER": "forgejo",
         "MCP_TRANSPORT": "stdio",
         "FORGEJO_URL": "${input:forgejoUrl}",
         "FORGEJO_ACCESS_TOKEN": "${input:forgejoAccessToken}",
@@ -30,9 +31,10 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "${workspaceFolder}/src/wikijs-sdlc-mcp-server/dist/index.js"
+        "${workspaceFolder}/dist/index.js"
       ],
       "env": {
+        "PROVIDER": "wikijs",
         "MCP_TRANSPORT": "stdio",
         "WIKIJS_MCP_URL": "${input:wikijsMcpUrl}",
         "WIKIJS_ACCESS_TOKEN": "${input:wikijsAccessToken}"

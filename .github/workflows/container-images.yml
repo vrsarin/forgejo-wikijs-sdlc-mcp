@@ -6,25 +6,35 @@ on:
       - ".github/workflows/container-images.yml"
       - ".github/actions/setup-pinned-trivy/action.yml"
       - ".github/dependabot.yml"
-      - ".dockerignore"
+      - "Dockerfile.dockerignore"
       - "VERSION"
       - "scripts/resolve-image-version.mjs"
-      - "src/shared/**"
-      - "src/forgejo-mcp-server/**"
-      - "src/wikijs-sdlc-mcp-server/**"
-      - "src/homeassistant-mcp-server/**"
+      - "Dockerfile"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - "src/index.ts"
+      - "src/core/**"
+      - "src/providers/forgejo/**"
+      - "src/providers/wikijs/**"
+      - "src/providers/homeassistant/**"
   push:
     branches: ["**"]
     paths:
       - ".github/workflows/container-images.yml"
       - ".github/actions/setup-pinned-trivy/action.yml"
-      - ".dockerignore"
+      - "Dockerfile.dockerignore"
       - "VERSION"
       - "scripts/resolve-image-version.mjs"
-      - "src/shared/**"
-      - "src/forgejo-mcp-server/**"
-      - "src/wikijs-sdlc-mcp-server/**"
-      - "src/homeassistant-mcp-server/**"
+      - "Dockerfile"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - "src/index.ts"
+      - "src/core/**"
+      - "src/providers/forgejo/**"
+      - "src/providers/wikijs/**"
+      - "src/providers/homeassistant/**"
   release:
     types: [published]
   workflow_dispatch:
@@ -53,21 +63,11 @@ jobs:
           fail-on-severity: high
 
   test:
-    name: Test ${{ matrix.image }}
+    name: Test unified image
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - image: forgejo-mcp-server
-            package: src/forgejo-mcp-server
-          - image: wikijs-sdlc-mcp-server
-            package: src/wikijs-sdlc-mcp-server
-          - image: homeassistant-mcp-server
-            package: src/homeassistant-mcp-server
     steps:
       - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
@@ -79,22 +79,17 @@ jobs:
         with:
           node-version: "26.13.0"
           cache: npm
-          cache-dependency-path: ${{ matrix.package }}/package-lock.json
+          cache-dependency-path: package-lock.json
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
-        working-directory: ${{ matrix.package }}
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
-        working-directory: ${{ matrix.package }}
       - name: Type-check
         run: npm run check
-        working-directory: ${{ matrix.package }}
       - name: Test
         run: npm test
-        working-directory: ${{ matrix.package }}
       - name: Build
         run: npm run build
-        working-directory: ${{ matrix.package }}
 
   scan:
     name: Scan ${{ matrix.image }} (${{ matrix.platform }})
@@ -108,28 +103,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - image: forgejo-mcp-server
-            dockerfile: src/forgejo-mcp-server/Dockerfile
+          - image: sdlc-mcp-server
+            dockerfile: Dockerfile
             platform: linux/amd64
             arch: amd64
-          - image: forgejo-mcp-server
-            dockerfile: src/forgejo-mcp-server/Dockerfile
-            platform: linux/arm64
-            arch: arm64
-          - image: wikijs-sdlc-mcp-server
-            dockerfile: src/wikijs-sdlc-mcp-server/Dockerfile
-            platform: linux/amd64
-            arch: amd64
-          - image: wikijs-sdlc-mcp-server
-            dockerfile: src/wikijs-sdlc-mcp-server/Dockerfile
-            platform: linux/arm64
-            arch: arm64
-          - image: homeassistant-mcp-server
-            dockerfile: src/homeassistant-mcp-server/Dockerfile
-            platform: linux/amd64
-            arch: amd64
-          - image: homeassistant-mcp-server
-            dockerfile: src/homeassistant-mcp-server/Dockerfile
+          - image: sdlc-mcp-server
+            dockerfile: Dockerfile
             platform: linux/arm64
             arch: arm64
     steps:
@@ -219,7 +198,8 @@ jobs:
       - uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           scan-type: config
-          scan-ref: src
+          scan-ref: .
+          skip-dirs: node_modules,.git,.artifacts,.coverage,dist
           skip-files: "**/Dockerfile.dockerignore"
           format: table
           exit-code: "1"
@@ -230,7 +210,8 @@ jobs:
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           scan-type: config
-          scan-ref: src
+          scan-ref: .
+          skip-dirs: node_modules,.git,.artifacts,.coverage,dist
           skip-files: "**/Dockerfile.dockerignore"
           format: sarif
           output: trivy-container-configuration.sarif
@@ -272,12 +253,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - image: forgejo-mcp-server
-            dockerfile: src/forgejo-mcp-server/Dockerfile
-          - image: wikijs-sdlc-mcp-server
-            dockerfile: src/wikijs-sdlc-mcp-server/Dockerfile
-          - image: homeassistant-mcp-server
-            dockerfile: src/homeassistant-mcp-server/Dockerfile
+          - image: sdlc-mcp-server
+            dockerfile: Dockerfile
     env:
       IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
     steps:

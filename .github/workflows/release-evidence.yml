@@ -47,18 +47,10 @@ jobs:
         with:
           node-version: "26.13.0"
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            src/forgejo-mcp-server/package-lock.json
-            src/wikijs-sdlc-mcp-server/package-lock.json
-            src/homeassistant-mcp-server/package-lock.json
+          cache-dependency-path: package-lock.json
       - name: Install locked dependencies
         shell: bash
-        run: |
-          npm ci --ignore-scripts
-          npm --prefix src/forgejo-mcp-server ci --ignore-scripts
-          npm --prefix src/wikijs-sdlc-mcp-server ci --ignore-scripts
-          npm --prefix src/homeassistant-mcp-server ci --ignore-scripts
+        run: npm ci --ignore-scripts
       - name: Run release verification
         run: npm run precommit
       - name: Generate the changelog and verification report
@@ -73,9 +65,7 @@ jobs:
             CHANGELOG.md \
             RELEASE-VERIFICATION.md \
             release-verification.json \
-            forgejo-mcp-server.cdx.json \
-            wikijs-sdlc-mcp-server.cdx.json \
-            homeassistant-mcp-server.cdx.json \
+            sdlc-mcp-server.cdx.json \
             release-evidence.tar.gz > SHA256SUMS
       - name: Store release evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -114,9 +104,7 @@ jobs:
             release-assets/CHANGELOG.md
             release-assets/RELEASE-VERIFICATION.md
             release-assets/release-verification.json
-            release-assets/forgejo-mcp-server.cdx.json
-            release-assets/wikijs-sdlc-mcp-server.cdx.json
-            release-assets/homeassistant-mcp-server.cdx.json
+            release-assets/sdlc-mcp-server.cdx.json
             release-assets/release-evidence.tar.gz
             release-assets/SHA256SUMS
           )

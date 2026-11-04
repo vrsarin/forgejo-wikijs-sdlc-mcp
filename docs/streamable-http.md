@@ -96,12 +96,10 @@ The `stdio` transport is for one local user:
 
 ## Test a released image
 
-1. Set each image variable to a release version or immutable digest.
+1. Set the shared image to a release version or immutable digest.
 
    ```env
-   FORGEJO_MCP_IMAGE=ghcr.io/vrsarin/forgejo-mcp-server:1.0.0
-   WIKIJS_SDLC_MCP_IMAGE=ghcr.io/vrsarin/wikijs-sdlc-mcp-server:1.0.0
-   HOMEASSISTANT_MCP_IMAGE=ghcr.io/vrsarin/homeassistant-mcp-server:1.0.0
+   SDLC_MCP_IMAGE=ghcr.io/vrsarin/sdlc-mcp-server:1.0.0
    ```
 
 2. Pull the selected profiles.
@@ -155,6 +153,7 @@ The TLS override expects `tls.crt` and `tls.key` in `.data/tls/<service>` by def
 Home Assistant is not part of the unauthenticated quick test. Its adapter requires:
 
 - an OIDC issuer and audience;
+- the `home-assistant-users` group claim (or the group configured by `HOMEASSISTANT_MCP_OIDC_REQUIRED_GROUP`);
 - a verified Home Assistant HTTPS endpoint at `https://home-assistant-upstream-tls`;
 - a 32-byte, base64-encoded token-encryption key;
 - a file that contains the discovery identity UUID;

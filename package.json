@@ -1,15 +1,29 @@
 {
-  "name": "sdlc-mcp-repository-tools",
+  "name": "@vrsarin/sdlc-mcp-server",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "coverage": "c8 make test",
+    "build": "tsc -p tsconfig.json --noEmit && esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "coverage": "c8 npm test",
+    "dev": "tsx src/index.ts",
     "lint": "eslint .",
     "precommit": "node scripts/pre-commit.mjs",
     "pr:changelog": "node scripts/validate-pr-changelog.mjs",
     "image:version": "node scripts/resolve-image-version.mjs",
     "release:evidence": "node scripts/generate-release-evidence.mjs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "start": "node dist/index.js",
+    "test": "node --import tsx --test test/core/*.test.ts test/providers/forgejo/*.test.ts test/providers/wikijs/*.test.ts test/providers/homeassistant/*.test.mjs scripts/*.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "2.1.2",
+    "@modelcontextprotocol/server": "2.4.0",
+    "jose": "6.1.3",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -17,6 +31,10 @@
     "eslint": "10.14.0",
     "globals": "17.14.0",
     "husky": "9.1.7",
+    "@types/node": "24.10.0",
+    "esbuild": "0.28.2",
+    "tsx": "4.20.6",
+    "typescript": "6.0.2",
     "typescript-eslint": "8.72.1"
   },
   "overrides": {

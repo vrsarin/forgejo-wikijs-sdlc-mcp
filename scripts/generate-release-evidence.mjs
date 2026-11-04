@@ -155,15 +155,11 @@ const runUrl =
     ? `${repositoryUrl}/actions/runs/${githubRunId}`
     : repositoryUrl);
 const images = [
-  imageDetails("forgejo-workflow-mcp:dev"),
-  imageDetails("wikijs-sdlc-mcp:dev"),
-  imageDetails("homeassistant-mcp:dev"),
+  imageDetails("sdlc-mcp-server:dev"),
 ];
 
 const sboms = [
-  ["forgejo-workflow-mcp.cdx.json", "forgejo-mcp-server.cdx.json"],
-  ["wikijs-sdlc-mcp.cdx.json", "wikijs-sdlc-mcp-server.cdx.json"],
-  ["homeassistant-mcp.cdx.json", "homeassistant-mcp-server.cdx.json"],
+  ["sdlc-mcp-server.cdx.json", "sdlc-mcp-server.cdx.json"],
 ].map(([sourceName, assetName]) => {
   const source = resolve(repositoryRoot, ".artifacts/sbom", sourceName);
   const asset = resolve(assetRoot, assetName);

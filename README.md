@@ -6,7 +6,7 @@
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/vrsarin/forgejo-wikijs-sdlc-mcp/badge)](https://securityscorecards.dev/viewer/?uri=github.com/vrsarin/forgejo-wikijs-sdlc-mcp)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)](LICENSE)
 
-This repository provides Model Context Protocol (MCP) servers for Forgejo, Wiki.js, and Home Assistant. You can deploy each server independently. You can connect it directly to VS Code, Claude, Codex, or an MCP gateway.
+This repository provides one Model Context Protocol (MCP) image for Forgejo, Wiki.js, and Home Assistant. Set `PROVIDER=forgejo`, `PROVIDER=wikijs`, or `PROVIDER=homeassistant` for each deployment. You can connect a deployment directly to VS Code, Claude, Codex, or an MCP gateway.
 
 Deployment platforms, identity providers, gateways, and provider applications are outside this repository. Use the servers independently or connect them to the bot, gateway, or integration harness that meets your requirements.
 
@@ -71,12 +71,10 @@ Use an external integration harness to test a complete identity-provider, gatewa
 
 ## Container images
 
-Successful image workflows publish multi-architecture images to GitHub Container Registry:
+Successful image workflows publish one multi-architecture image to GitHub Container Registry:
 
 ```text
-ghcr.io/vrsarin/forgejo-mcp-server
-ghcr.io/vrsarin/wikijs-sdlc-mcp-server
-ghcr.io/vrsarin/homeassistant-mcp-server
+ghcr.io/vrsarin/sdlc-mcp-server
 ```
 
 The repository uses the stable version in `VERSION` to create unique Semantic Versioning (SemVer) image versions at each promotion stage:

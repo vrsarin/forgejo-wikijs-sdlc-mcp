@@ -8,6 +8,8 @@ Forgejo Workflow MCP and Wiki.js SDLC MCP can disable OpenID Connect (OIDC) and 
 
 > **Warning:** Do not connect an unauthenticated MCP server to a shared or untrusted network. A host allowlist and an origin allowlist do not authenticate a caller.
 
+The Home Assistant MCP endpoint is a gateway-to-server raw proxy and intentionally rejects every request carrying an `Origin` header. Its browser-based OAuth routes remain available separately. Forgejo and Wiki.js use `MCP_ALLOWED_ORIGINS` because their native MCP endpoints may be called by explicitly allowlisted browser origins.
+
 ## Select a deployment mode
 
 | Environment          | OIDC     | TLS      | Certificate source                        |

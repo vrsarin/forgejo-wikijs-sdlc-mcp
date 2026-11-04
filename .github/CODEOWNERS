@@ -5,6 +5,7 @@
 ## Security-sensitive surfaces
 
 /.github/ @vrsarin
-/src/shared/ @vrsarin
+/src/core/ @vrsarin
+/src/providers/ @vrsarin
 /docs/deployment-security.md @vrsarin
 /SECURITY.md @vrsarin
