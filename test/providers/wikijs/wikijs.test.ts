@@ -51,7 +51,8 @@ test('discovery accepts bounded SSE JSON-RPC responses', async () => {
     const result = body.method === 'initialize'
       ? { protocolVersion: '2025-06-18', serverInfo: { name: 'wiki' } }
       : { tools: [{ name: 'search_pages' }] }
-    return new Response(`event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result })}\n\n`, {
+    const notification = JSON.stringify({ jsonrpc: '2.0', method: 'notifications/message', params: { level: 'info' } })
+    return new Response(`event: message\ndata: ${notification}\n\nevent: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result })}\n\n`, {
       headers: { 'content-type': 'text/event-stream', 'mcp-session-id': 'sse-session' }
     })
   } })
@@ -66,7 +67,7 @@ test('each user is discovered with their own token', async () => {
 })
 
 test('Wiki.js refusals surface their reason without echoing the token', async () => {
-  const { client: wiki } = client(() => Response.json({ jsonrpc: '2.0', id: null, error: { message: 'The owner of this token does not hold the use:mcp permission.' } }, { status: 403 }))
+  const { client: wiki } = client((body) => Response.json({ jsonrpc: '2.0', id: body.id, error: { message: 'The owner of this token does not hold the use:mcp permission.' } }, { status: 403 }))
   await assert.rejects(() => wiki.discover('secret-token'), (error: unknown) => error instanceof WikiJsError && error.status === 403 && /use:mcp/.test(error.message) && !error.message.includes('secret-token'))
 })
 

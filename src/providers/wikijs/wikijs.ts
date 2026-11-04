@@ -76,7 +76,7 @@ export class WikiJsClient {
       throw new WikiJsError('Wiki.js response exceeded the configured limit', response.status)
     }
     let body: { result?: T; error?: { message?: string } } | undefined
-    try { body = text ? this.#decodeResponse(text, response.headers.get('content-type')) : undefined } catch { throw new WikiJsError('Wiki.js returned an invalid Streamable HTTP response', response.status) }
+    try { body = text ? this.#decodeResponse<T>(text, response.headers.get('content-type'), id) : undefined } catch { throw new WikiJsError('Wiki.js returned an invalid Streamable HTTP response', response.status) }
     if (!response.ok || body?.error || body?.result === undefined) {
       // Wiki.js explains its refusals (disabled, missing scope, missing use:mcp); none of that echoes the token.
       throw new WikiJsError(`Wiki.js MCP refused ${method} (HTTP ${response.status}): ${body?.error?.message ?? 'no result'}`, response.status)
@@ -85,15 +85,21 @@ export class WikiJsClient {
     return { result: body.result, ...(nextSession ? { sessionId: nextSession } : {}) }
   }
 
-  #decodeResponse<T>(text: string, contentType: string | null): { result?: T; error?: { message?: string } } {
-    if (!contentType?.toLowerCase().includes('text/event-stream')) return JSON.parse(text) as { result?: T; error?: { message?: string } }
+  #decodeResponse<T>(text: string, contentType: string | null, expectedId: number): { result?: T; error?: { message?: string } } {
+    if (!contentType?.toLowerCase().includes('text/event-stream')) {
+      const message = JSON.parse(text) as { id?: unknown; result?: T; error?: { message?: string } }
+      if (message.id !== expectedId) throw new Error('JSON-RPC response ID did not match the request')
+      return message
+    }
     for (const event of text.replaceAll('\r\n', '\n').split('\n\n')) {
       const data = event.split('\n')
         .filter((line) => line.startsWith('data:'))
         .map((line) => line.slice(5).trimStart())
         .join('\n')
-      if (data && data !== '[DONE]') return JSON.parse(data) as { result?: T; error?: { message?: string } }
+      if (!data || data === '[DONE]') continue
+      const message = JSON.parse(data) as { id?: unknown; result?: T; error?: { message?: string } }
+      if (message.id === expectedId) return message
     }
-    throw new Error('SSE response did not contain a JSON-RPC message')
+    throw new Error('SSE response did not contain the matching JSON-RPC response')
   }
 }
