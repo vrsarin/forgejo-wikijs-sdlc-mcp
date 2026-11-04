@@ -142,7 +142,7 @@ export abstract class BaseProviderOAuth<Extension extends object = object> {
       this.#notify(pending.subject)
       return this.page(200, `${this.label} connected`, 'You can close this tab and return to your assistant.')
     } catch {
-      console.error(`${this.label} connection failed; upstream details were redacted`)
+      console.error('Provider OAuth connection failed; upstream details were redacted')
       return this.page(502, 'Not connected', `${this.label} did not accept the sign-in. Ask your assistant to connect ${this.label} again, or check the MCP server logs.`)
     }
   }
