@@ -11,17 +11,28 @@ const assetRoot = resolve(repositoryRoot, ".artifacts/release-assets");
 const bundleRoot = resolve(repositoryRoot, ".artifacts/release-bundle");
 const bundleLogRoot = resolve(bundleRoot, "logs");
 const releaseTag = process.env.RELEASE_TAG ?? "";
-const repositoryName = process.env.GITHUB_REPOSITORY ?? "";
-const serverUrl = process.env.GITHUB_SERVER_URL ?? "https://github.com";
-const runId = process.env.GITHUB_RUN_ID ?? "";
+const repositoryName =
+  process.env.CI_REPOSITORY ?? process.env.GITHUB_REPOSITORY ?? "";
+const serverUrl =
+  process.env.CI_SERVER_URL ?? process.env.GITHUB_SERVER_URL ?? "";
+const githubRunId = process.env.GITHUB_RUN_ID ?? "";
+const intendedVersion = readFileSync(
+  resolve(repositoryRoot, "VERSION"),
+  "utf8",
+).trim();
 
-if (!/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(releaseTag)) {
+if (!/^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/.test(releaseTag)) {
   throw new Error(
     `Release tag is not a supported semantic version: ${releaseTag}`,
   );
 }
+if (releaseTag !== `v${intendedVersion}`) {
+  throw new Error(
+    `Release tag ${releaseTag} must match VERSION (v${intendedVersion})`,
+  );
+}
 if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repositoryName)) {
-  throw new Error(`GITHUB_REPOSITORY is invalid: ${repositoryName}`);
+  throw new Error(`CI_REPOSITORY is invalid: ${repositoryName}`);
 }
 
 function command(commandName, args, options = {}) {
@@ -129,9 +140,20 @@ if (
 
 const previousTag = findPreviousTag();
 const commits = readCommits(previousTag);
-const repositoryUrl = `${serverUrl}/${repositoryName}`;
+const repositoryUrl =
+  process.env.CI_REPOSITORY_URL ??
+  (serverUrl ? `${serverUrl}/${repositoryName}` : "");
+if (!repositoryUrl) {
+  throw new Error("CI_REPOSITORY_URL or CI_SERVER_URL is required");
+}
+const commitUrlPrefix =
+  process.env.CI_COMMIT_URL_PREFIX ?? `${repositoryUrl}/commit`;
 const generatedAt = new Date().toISOString();
-const runUrl = runId ? `${repositoryUrl}/actions/runs/${runId}` : repositoryUrl;
+const runUrl =
+  process.env.CI_RUN_URL ??
+  (githubRunId
+    ? `${repositoryUrl}/actions/runs/${githubRunId}`
+    : repositoryUrl);
 const images = [
   imageDetails("forgejo-workflow-mcp:dev"),
   imageDetails("wikijs-sdlc-mcp:dev"),
@@ -171,15 +193,15 @@ for (const result of evidence.results) {
 const changeLines = commits.length
   ? commits.map(
       (commit) =>
-        `- ${escapeMarkdown(commit.subject)} ([${commit.shortSha}](${repositoryUrl}/commit/${commit.sha}))`,
+        `- ${escapeMarkdown(commit.subject)} ([${commit.shortSha}](${commitUrlPrefix}/${commit.sha}))`,
     )
   : ["- No non-merge commits were found."];
 const comparison = previousTag
-  ? `[${previousTag}...${releaseTag}](${repositoryUrl}/compare/${previousTag}...${releaseTag})`
+  ? `[${previousTag}...${releaseTag}](${process.env.CI_COMPARE_URL ?? `${repositoryUrl}/compare/${previousTag}...${releaseTag}`})`
   : "Initial release";
 const changelog = `# ${releaseTag} changelog
 
-Released from commit [\`${releaseCommit.slice(0, 12)}\`](${repositoryUrl}/commit/${releaseCommit}).
+Released from commit [\`${releaseCommit.slice(0, 12)}\`](${commitUrlPrefix}/${releaseCommit}).
 
 Comparison: ${comparison}
 
@@ -206,8 +228,8 @@ Overall result: **PASS**
 | --- | --- |
 | Generated (UTC) | ${generatedAt} |
 | Release tag | \`${releaseTag}\` |
-| Release commit | [\`${releaseCommit}\`](${repositoryUrl}/commit/${releaseCommit}) |
-| Workflow run | [View the GitHub Actions run](${runUrl}) |
+| Release commit | [\`${releaseCommit}\`](${commitUrlPrefix}/${releaseCommit}) |
+| CI/CD run | [View the pipeline run](${runUrl}) |
 | Node.js | \`${evidence.node}\` |
 | Docker Engine | \`${evidence.docker}\` |
 | Trivy image | \`${evidence.scanner}\` |
@@ -222,7 +244,7 @@ The successful Trivy gates confirm zero detected secrets and zero high or critic
 
 ## Tested container images
 
-These image identifiers refer to the local images built from the release commit for verification. Registry images have separate GitHub attestations and digests.
+These image identifiers refer to the local images built from the release commit for verification. Registry images have separate attestations and digests.
 
 | Image | Local image identifier | Size (bytes) |
 | --- | --- | ---: |
@@ -244,7 +266,7 @@ const verificationJson = {
     commit: releaseCommit,
     previousTag: previousTag || null,
     repository: repositoryName,
-    workflowRun: runUrl,
+    pipelineRun: runUrl,
   },
   environment: {
     node: evidence.node,

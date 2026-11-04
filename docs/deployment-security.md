@@ -103,6 +103,31 @@ Apply these runtime controls:
 
 The repository Compose files apply these controls. Preserve them in another deployment platform.
 
+## Promote a release image
+
+Promote one immutable image digest through TEST, user acceptance testing (UAT), and production. Do not rebuild or replace the image between environments.
+
+1. Verify the image digest, source commit, software bill of materials (SBOM), vulnerability results, provenance, and attestation.
+2. Deploy the digest to TEST.
+3. Run the required functional, security, compatibility, performance, and rollback tests.
+4. Obtain the required approval before UAT deployment.
+5. Deploy the same digest to UAT.
+6. Run the approved acceptance scenarios.
+7. Obtain the production approval after the UAT owner signs off.
+8. Deploy the same digest to production.
+9. Run production smoke tests and observe the defined health indicators.
+
+Apply these controls to shared environments:
+
+- prevent self-approval when separation of duties is required;
+- restrict deployments to approved source branches and tags;
+- keep credentials and workload identities scoped to one environment;
+- allow only one deployment to a shared target at a time;
+- record the digest, tests, approval, deployment result, and rollback digest;
+- make the next promotion available only after the current environment passes.
+
+If TEST or UAT rejects a stable release, do not replace the image or move its Git tag. Correct the source and create a new patch release. Restore the previously verified digest when a failed deployment affects service health.
+
 ## Verify the deployment
 
 1. Request `/healthz` with the expected scheme and server name.
@@ -116,4 +141,4 @@ The deployment is ready when all checks give the expected result.
 
 ## Build evidence
 
-The release workflow tests and scans each image for the supported architectures. GitHub publishes current workflow results, code-scanning results, software bills of materials, provenance, and attestations. Review that live evidence before deployment. Rebuild an image when a relevant dependency or base-image update becomes available.
+The release pipeline tests and scans each image for the supported architectures. The git server, CI/CD system, and registry publish current pipeline results, code-scanning results, software bills of materials, provenance, and attestations. Review that live evidence before deployment. Rebuild an image when a relevant dependency or base-image update becomes available.

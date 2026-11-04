@@ -6,20 +6,25 @@ on:
       - ".github/workflows/container-images.yml"
       - ".github/dependabot.yml"
       - ".dockerignore"
+      - "VERSION"
+      - "scripts/resolve-image-version.mjs"
       - "src/shared/**"
       - "src/forgejo-mcp-server/**"
       - "src/wikijs-sdlc-mcp-server/**"
       - "src/homeassistant-mcp-server/**"
   push:
-    branches: [main]
-    tags: ["v*"]
+    branches: ["**"]
     paths:
       - ".github/workflows/container-images.yml"
       - ".dockerignore"
+      - "VERSION"
+      - "scripts/resolve-image-version.mjs"
       - "src/shared/**"
       - "src/forgejo-mcp-server/**"
       - "src/wikijs-sdlc-mcp-server/**"
       - "src/homeassistant-mcp-server/**"
+  release:
+    types: [published]
   workflow_dispatch:
 
 concurrency:
@@ -244,8 +249,8 @@ jobs:
   publish:
     name: Publish ${{ matrix.image }}
     if: >-
-      github.event_name != 'pull_request' &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+      github.event_name == 'push' ||
+      (github.event_name == 'release' && github.event.release.prerelease == false)
     needs: [test, scan, configuration-scan]
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -275,6 +280,15 @@ jobs:
           persist-credentials: false
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Resolve the semantic image version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: node scripts/resolve-image-version.mjs
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
@@ -286,17 +300,21 @@ jobs:
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.IMAGE_NAME }}
+          flavor: latest=false
           tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,format=long
+            type=raw,value=${{ steps.version.outputs.version }}
           labels: |
             org.opencontainers.image.title=${{ matrix.image }}
             org.opencontainers.image.description=Governed SDLC MCP server from ${{ github.repository }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
             org.opencontainers.image.licenses=AGPL-3.0-only
+            io.github.sdlc-mcp.release-stage=${{ steps.version.outputs.stage }}
+            io.github.sdlc-mcp.source-ref=${{ github.ref }}
+            io.github.sdlc-mcp.source-head-ref=${{ github.head_ref || github.ref_name }}
+            io.github.sdlc-mcp.source-head-revision=${{ github.event.pull_request.head.sha || github.sha }}
+            io.github.sdlc-mcp.workflow-run=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Build and push multi-platform image
         id: push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7

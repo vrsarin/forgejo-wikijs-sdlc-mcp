@@ -26,10 +26,10 @@ Do not include these content types:
 - internal proposals or roadmaps;
 - handover notes or backup copies;
 - point-in-time scan reports;
-- copies of GitHub Actions, code-scanning, dependency, package, or attestation data;
+- copies of CI/CD runs, code-scanning, dependency, package, or attestation data;
 - deployment-platform instructions that belong to a consumer or external integration harness.
 
-Manage decisions and project planning in the approved external system. Use GitHub for live repository and package evidence.
+Manage decisions and project planning in the approved external system. Use the git server, CI/CD system, and package registry for live evidence.
 
 ## Information design
 

@@ -6,6 +6,7 @@
     "lint": "eslint .",
     "precommit": "node scripts/pre-commit.mjs",
     "pr:changelog": "node scripts/validate-pr-changelog.mjs",
+    "image:version": "node scripts/resolve-image-version.mjs",
     "release:evidence": "node scripts/generate-release-evidence.mjs",
     "prepare": "husky"
   },

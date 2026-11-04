@@ -60,16 +60,25 @@ function escapeWorkflowCommand(value) {
 }
 
 function main() {
-  const eventPath = process.env.GITHUB_EVENT_PATH
-  if (!eventPath) throw new Error('GITHUB_EVENT_PATH is required')
+  let title = process.env.CI_PR_TITLE
+  let body = process.env.CI_PR_BODY
 
-  const event = JSON.parse(readFileSync(eventPath, 'utf8'))
-  const pullRequest = event.pull_request
-  if (!pullRequest) throw new Error('The GitHub event does not contain a pull request')
+  if (title === undefined || body === undefined) {
+    const eventPath = process.env.CI_EVENT_PATH ?? process.env.GITHUB_EVENT_PATH
+    if (!eventPath) {
+      throw new Error('Set CI_PR_TITLE and CI_PR_BODY, or provide CI_EVENT_PATH')
+    }
+
+    const event = JSON.parse(readFileSync(eventPath, 'utf8'))
+    const pullRequest = event.pull_request
+    if (!pullRequest) throw new Error('The CI event does not contain a pull request')
+    title = pullRequest.title ?? ''
+    body = pullRequest.body ?? ''
+  }
 
   const errors = validatePullRequest({
-    title: pullRequest.title ?? '',
-    body: pullRequest.body ?? ''
+    title,
+    body
   })
   if (errors.length === 0) {
     console.log('Pull request changelog requirements: PASS')
@@ -77,10 +86,13 @@ function main() {
   }
 
   for (const error of errors) {
-    console.error(`::error title=PR changelog requirement::${escapeWorkflowCommand(error)}`)
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      console.error(`::error title=PR changelog requirement::${escapeWorkflowCommand(error)}`)
+    }
+    console.error(`- ${error}`)
   }
   console.error('\nPull request changelog requirements: FAIL')
-  console.error('See .github/PULL_REQUEST_TEMPLATE.md for the required format.')
+  console.error('See the pull request template for the required format.')
   process.exitCode = 1
 }
 

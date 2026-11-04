@@ -69,7 +69,7 @@ Use an external integration harness to test a complete identity-provider, gatewa
 
 ## Container images
 
-Successful `main` and `v*` release workflows publish multi-architecture images to GitHub Container Registry:
+Successful image workflows publish multi-architecture images to GitHub Container Registry:
 
 ```text
 ghcr.io/vrsarin/forgejo-mcp-server
@@ -77,13 +77,24 @@ ghcr.io/vrsarin/wikijs-sdlc-mcp-server
 ghcr.io/vrsarin/homeassistant-mcp-server
 ```
 
-Use a released version or immutable digest in shared environments. Development and prerelease tags are intended for integration testing, not production pinning.
+The repository uses the stable version in `VERSION` to create unique Semantic Versioning (SemVer) image versions at each promotion stage:
+
+| Source event | Example image version | Intended use |
+| --- | --- | --- |
+| Push to `feature/*`, `bug/*`, or `hotfix/*` | `0.1.0-dev.42.1` | Milestone change integration |
+| Milestone branch `release/identity-hardening` | `0.1.0-beta.56.1` | Integrated SIT and TEST |
+| Merge into `main` | `0.1.0-rc.61.1` | Release-candidate testing |
+| Published git server release `v0.1.0` | `0.1.0` | Certified release |
+
+The `release/<milestone-name>` branch is the milestone branch. Its name identifies the planned outcome, not a version. The `VERSION` file records the current intended SemVer version and can change without renaming the milestone branch. A `feature/*`, `bug/*`, or `hotfix/*` branch is a milestone change branch and must start from the applicable milestone branch. The counters make concurrent milestone change and milestone-branch images unique. Pull requests build, test, and scan the proposed merge without publishing another image version. Each published image records its source ref, source commit, CI/CD run, SBOM, maximum build provenance, and artifact attestation. Only a published stable release creates a stable image version. The release tag must match `VERSION`.
+
+Use a certified version or immutable digest in production. Use development, beta, and release-candidate versions only in their designated test stage.
 
 ## Security and build evidence
 
 GitHub Actions runs CodeQL, Trivy, dependency review, npm audit, and OpenSSF Scorecard checks. GitHub publishes current results in the repository **Actions** and **Security** views. Released images include an SBOM, build provenance, and an artifact attestation.
 
-Each published GitHub Release also includes these generated assets:
+Each published stable release also includes these generated assets:
 
 - a changelog for the commits since the previous release;
 - Markdown and JSON verification reports;

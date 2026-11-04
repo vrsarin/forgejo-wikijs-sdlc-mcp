@@ -26,7 +26,7 @@ check:
 test:
 	@for package in $(PACKAGES); do npm --prefix $$package test || exit 1; done
 	node --test src/shared/homeassistant-oauth.test.mjs
-	node --test scripts/validate-pr-changelog.test.mjs
+	node --test scripts/*.test.mjs
 
 images:
 	docker build -f src/forgejo-mcp-server/Dockerfile -t forgejo-workflow-mcp:dev .
