@@ -1,8 +1,8 @@
 # Standalone SDLC MCP servers
 
-[![Container images](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/container-images.yml/badge.svg?branch=feature%2Fbase_setup)](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/container-images.yml?query=branch%3Afeature%2Fbase_setup)
-[![CodeQL](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/codeql.yml/badge.svg?branch=feature%2Fbase_setup)](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/codeql.yml?query=branch%3Afeature%2Fbase_setup)
-[![Repository security](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/repository-security.yml/badge.svg?branch=feature%2Fbase_setup)](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/repository-security.yml?query=branch%3Afeature%2Fbase_setup)
+[![Container images](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/container-images.yml/badge.svg?branch=main)](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/container-images.yml?query=branch%3Amain)
+[![CodeQL](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/codeql.yml?query=branch%3Amain)
+[![Repository security](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/repository-security.yml/badge.svg?branch=main)](https://github.com/vrsarin/forgejo-wikijs-sdlc-mcp/actions/workflows/repository-security.yml?query=branch%3Amain)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/vrsarin/forgejo-wikijs-sdlc-mcp/badge)](https://securityscorecards.dev/viewer/?uri=github.com/vrsarin/forgejo-wikijs-sdlc-mcp)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)](LICENSE)
 
