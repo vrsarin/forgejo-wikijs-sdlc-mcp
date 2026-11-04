@@ -1,0 +1,16 @@
+{
+	"mcpServers": {
+		"forgejoWorkflow": {
+			"type": "http",
+			"url": "http://127.0.0.1:3010/mcp"
+		},
+		"wikijsSdlc": {
+			"type": "http",
+			"url": "http://127.0.0.1:3011/mcp"
+		},
+		"homeAssistant": {
+			"type": "http",
+			"url": "http://127.0.0.1:3012/mcp"
+		}
+	}
+}

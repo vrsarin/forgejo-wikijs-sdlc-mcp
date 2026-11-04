@@ -1,0 +1,27 @@
+services:
+  forgejo-mcp:
+    environment:
+      ENABLE_TLS: "true"
+      TLS_MODE: ${TLS_MODE:-static}
+      TLS_CERT_PATH: /run/tls/tls.crt
+      TLS_KEY_PATH: /run/tls/tls.key
+    volumes:
+      - ${FORGEJO_MCP_TLS_DIR:-./.data/tls/forgejo}:/run/tls:ro
+
+  wikijs-sdlc-mcp:
+    environment:
+      ENABLE_TLS: "true"
+      TLS_MODE: ${TLS_MODE:-static}
+      TLS_CERT_PATH: /run/tls/tls.crt
+      TLS_KEY_PATH: /run/tls/tls.key
+    volumes:
+      - ${WIKIJS_MCP_TLS_DIR:-./.data/tls/wikijs}:/run/tls:ro
+
+  homeassistant-mcp:
+    environment:
+      ENABLE_TLS: "true"
+      TLS_MODE: ${TLS_MODE:-static}
+      TLS_CERT_PATH: /run/tls/tls.crt
+      TLS_KEY_PATH: /run/tls/tls.key
+    volumes:
+      - ${HOMEASSISTANT_MCP_TLS_DIR:-./.data/tls/homeassistant}:/run/tls:ro

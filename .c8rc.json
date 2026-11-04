@@ -1,0 +1,20 @@
+{
+  "all": true,
+  "include": [
+    "src/core/*.{ts,mjs}",
+    "src/providers/**/*.{ts,mjs}"
+  ],
+  "exclude": [
+    "src/providers/*/index.*",
+    "src/providers/*/runtime.*",
+    "src/providers/*/test-upstream-tls.*",
+    "**/*.test.*"
+  ],
+  "reporter": [
+    "text",
+    "cobertura"
+  ],
+  "reports-dir": ".coverage",
+  "check-coverage": true,
+  "lines": 85
+}
