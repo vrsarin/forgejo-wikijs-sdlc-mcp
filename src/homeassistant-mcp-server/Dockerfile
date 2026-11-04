@@ -4,8 +4,7 @@ COPY src/homeassistant-mcp-server/package.json src/homeassistant-mcp-server/pack
 RUN npm ci --ignore-scripts
 COPY src/wikijs-sdlc-mcp-server/src/oauth/store.ts ./store.ts
 COPY src/shared/tls-http.ts ./tls-http.ts
-COPY src/shared/homeassistant-oauth.mjs ./homeassistant-oauth.mjs
-COPY src/homeassistant-mcp-server/src/app.mjs src/homeassistant-mcp-server/src/auth.mjs src/homeassistant-mcp-server/src/index.mjs ./src/
+COPY src/homeassistant-mcp-server/src/app.mjs src/homeassistant-mcp-server/src/auth.mjs src/homeassistant-mcp-server/src/homeassistant-oauth.mjs src/homeassistant-mcp-server/src/index.mjs ./src/
 RUN ./node_modules/.bin/tsc --target es2022 --module nodenext --moduleResolution nodenext --types node --skipLibCheck --outDir compiled store.ts tls-http.ts \
     && cp compiled/store.js ./store.js \
     && cp compiled/tls-http.js ./tls-http.js \

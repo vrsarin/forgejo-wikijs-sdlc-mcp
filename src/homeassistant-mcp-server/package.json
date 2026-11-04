@@ -15,7 +15,7 @@
     "typescript": "6.0.2"
   },
   "scripts": {
-    "check": "node --check src/app.mjs && node --check src/auth.mjs && node --check src/index.mjs && node --check src/test-upstream-tls.mjs && node --check ../shared/homeassistant-oauth.mjs",
+    "check": "node --check src/app.mjs && node --check src/auth.mjs && node --check src/homeassistant-oauth.mjs && node --check src/index.mjs && node --check src/test-upstream-tls.mjs",
     "build": "npm run check",
     "test": "node --test test/*.test.mjs"
   }

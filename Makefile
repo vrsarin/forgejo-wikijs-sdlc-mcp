@@ -25,7 +25,6 @@ check:
 
 test:
 	@for package in $(PACKAGES); do npm --prefix $$package test || exit 1; done
-	node --test src/shared/homeassistant-oauth.test.mjs
 	node --test scripts/*.test.mjs
 
 coverage:

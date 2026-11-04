@@ -6,10 +6,10 @@
 !src/homeassistant-mcp-server/src/
 !src/homeassistant-mcp-server/src/app.mjs
 !src/homeassistant-mcp-server/src/auth.mjs
+!src/homeassistant-mcp-server/src/homeassistant-oauth.mjs
 !src/homeassistant-mcp-server/src/index.mjs
 !src/shared/
 !src/shared/acme-entrypoint.sh
-!src/shared/homeassistant-oauth.mjs
 !src/shared/tls-http.ts
 !src/wikijs-sdlc-mcp-server/
 !src/wikijs-sdlc-mcp-server/src/

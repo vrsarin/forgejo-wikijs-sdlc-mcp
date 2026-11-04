@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { Readable } from 'node:stream'
 import { EncryptedFileStore } from '../store.js'
 import { createMcpHttpServer, tlsFilesFromEnvironment } from '../tls-http.js'
-import { HomeAssistantOAuth } from '../homeassistant-oauth.mjs'
+import { HomeAssistantOAuth } from './homeassistant-oauth.mjs'
 import { HomeAssistantVerifier } from './auth.mjs'
 import { createHomeAssistantApp } from './app.mjs'
 
