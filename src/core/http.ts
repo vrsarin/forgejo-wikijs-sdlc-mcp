@@ -19,6 +19,22 @@ import { isAllowedHost } from './http-util.js'
 import { enforceRateLimit, FixedWindowRateLimiter } from './rate-limit.js'
 import { readBounded } from './read-bounded.js'
 
+const MAX_MCP_REQUEST_BYTES = 4 * 1024 * 1024
+type RequestCategory = 'discovery' | 'tool' | 'other'
+
+export async function classifyMcpRequest(request: Request): Promise<RequestCategory> {
+  if (request.method !== 'POST' || !request.body) return 'other'
+  let raw: Buffer
+  try {
+    raw = await readBounded(request.clone().body, MAX_MCP_REQUEST_BYTES)
+  } catch {
+    throw new RangeError('MCP request exceeds the supported size limit')
+  }
+  const body = JSON.parse(raw.toString('utf8')) as { method?: unknown }
+  if (typeof body?.method !== 'string') return 'other'
+  return body.method === 'tools/call' ? 'tool' : DISCOVERY_METHODS.has(body.method) ? 'discovery' : 'other'
+}
+
 export interface HttpServerOptions {
   host: string
   port: number
@@ -109,12 +125,11 @@ export async function serveHttp(provider: ProviderDefinition, factory: () => Mcp
       if (new URL(request.url).pathname !== '/mcp') return response(404, 'not found')
       const auth = oidcGate ? await oidcGate(request) : await authorizeRequest(request, options)
       if (auth instanceof Response) return auth
-      let category: 'discovery' | 'tool' | 'other' = 'other'
-      if (request.method === 'POST' && request.body) {
-        try {
-          const body = JSON.parse((await readBounded(request.clone().body, 64 * 1024)).toString('utf8')) as { method?: unknown }
-          if (typeof body?.method === 'string') category = body.method === 'tools/call' ? 'tool' : DISCOVERY_METHODS.has(body.method) ? 'discovery' : 'other'
-        } catch { /* The SDK returns the protocol error for malformed requests. */ }
+      let category: RequestCategory
+      try {
+        category = await classifyMcpRequest(request)
+      } catch (error) {
+        return response(error instanceof RangeError ? 413 : 400, error instanceof RangeError ? 'request body is too large' : 'request body is not valid JSON')
       }
       const identity =
         typeof auth.extra?.subject === 'string' && auth.extra.subject.length > 0

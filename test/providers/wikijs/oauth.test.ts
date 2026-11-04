@@ -79,6 +79,14 @@ test('the client is registered with the wiki once and reused', async () => {
   assert.equal(remote.calls.filter((path) => path === '/_oauth/register').length, 1)
 })
 
+test('concurrent first-time sign-ins share one client registration', async () => {
+  const { oauth, remote } = await setup()
+  const starts = await Promise.all([oauth.beginConnect('alice'), oauth.beginConnect('bob')])
+  const redirects = await Promise.all(starts.map((start) => oauth.handleStart(new URL(start))))
+  assert.equal(remote.calls.filter((path) => path === '/_oauth/register').length, 1)
+  assert.deepEqual(redirects.map((response) => new URL(response.headers.get('location')!).searchParams.get('client_id')), ['client-1', 'client-1'])
+})
+
 test('the callback is refused from a different browser, replayed, or after expiry', async () => {
   const a = await setup()
   const other = await connect(a.oauth, a.remote, 'alice')

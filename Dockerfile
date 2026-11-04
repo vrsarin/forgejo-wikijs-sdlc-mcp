@@ -25,6 +25,6 @@ RUN apk add --no-cache certbot \
 VOLUME /data
 USER node:node
 EXPOSE 3000 8080
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD ["node", "-e", "const p=process.env.ENABLE_TLS==='true'?'https':'http';require(p).get(p+'://127.0.0.1:'+(process.env.MCP_PORT||3000)+'/healthz',{rejectUnauthorized:false},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD ["node", "-e", "const e=process.env,t=e.ENABLE_TLS==='true'||(e.ENABLE_TLS===undefined&&e.MCP_TLS_CERT_PATH&&e.MCP_TLS_KEY_PATH),p=t?'https':'http';require(p).get(p+'://127.0.0.1:'+(e.MCP_PORT||3000)+'/healthz',{rejectUnauthorized:false},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
 ENTRYPOINT ["acme-entrypoint"]
 CMD ["node", "/mcp/index.js"]

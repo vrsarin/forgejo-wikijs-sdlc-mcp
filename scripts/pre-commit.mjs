@@ -41,6 +41,22 @@ const stagedFiles = output('git', ['diff', '--cached', '--name-only']).split('\n
 const dockerVersion = output('docker', ['version', '--format', '{{.Server.Version}}'])
 const results = []
 
+function gitPaths(args) {
+  const result = spawnSync('git', args, { cwd: repository, encoding: 'utf8' })
+  if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed`)
+  return result.stdout.trim().split('\n').filter(Boolean)
+}
+
+function assertStagedSnapshot() {
+  const unstaged = gitPaths(['diff', '--name-only', '--no-ext-diff'])
+  const untracked = gitPaths(['ls-files', '--others', '--exclude-standard'])
+  if (unstaged.length || untracked.length) {
+    throw new Error(`Pre-commit verification requires a clean working tree outside the index; stage or remove: ${[...unstaged, ...untracked].join(', ')}`)
+  }
+  const currentTree = output('git', ['write-tree'])
+  if (currentTree !== stagedTree) throw new Error('The staged Git tree changed during pre-commit verification')
+}
+
 function safeName(name) {
   return name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-').replaceAll(/^-|-$/g, '')
 }
@@ -126,6 +142,7 @@ The detailed logs are stored locally in \`${relative(repository, runRoot)}\`. At
 
 let status = 'PASS'
 try {
+  assertStagedSnapshot()
   for (const check of checks) {
     const result = await runCheck(check)
     results.push(result)
@@ -134,6 +151,7 @@ try {
       break
     }
   }
+  if (status === 'PASS') assertStagedSnapshot()
 } catch (error) {
   status = 'FAIL'
   results.push({

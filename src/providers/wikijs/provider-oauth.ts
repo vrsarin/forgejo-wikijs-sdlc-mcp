@@ -26,6 +26,7 @@ export class ProviderOAuth extends BaseProviderOAuth<WikiStateExtension> {
   protected readonly id = 'wikijs'
   protected readonly label = 'Wiki.js'
   readonly #options: ProviderOAuthOptions
+  #registering: Promise<StoredClient> | undefined
 
   constructor(options: ProviderOAuthOptions) { super(options); this.#options = options }
 
@@ -68,6 +69,10 @@ export class ProviderOAuth extends BaseProviderOAuth<WikiStateExtension> {
     const existing = (await this.loadState()).client
     const redirectUri = this.redirectUrl.toString()
     if (existing && existing.origin === this.#origin && existing.redirectUri === redirectUri) return existing
+    return (this.#registering ??= this.#registerClient(redirectUri).finally(() => { this.#registering = undefined }))
+  }
+
+  async #registerClient(redirectUri: string): Promise<StoredClient> {
     const response = await this.fetcher(new URL('/_oauth/register', this.#origin), {
       method: 'POST', redirect: 'error', signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       headers: { 'content-type': 'application/json', accept: 'application/json' },

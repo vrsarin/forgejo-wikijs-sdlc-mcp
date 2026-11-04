@@ -15,7 +15,7 @@ Deployment platforms, identity providers, gateways, and provider applications ar
 | Component                 | Purpose                                                          | Default write posture                      |
 | ------------------------- | ---------------------------------------------------------------- | ------------------------------------------ |
 | Forgejo MCP server        | Repository, issue, pull-request, review, and workflow operations | Disabled and repository-allowlisted        |
-| Wiki.js SDLC MCP server   | Permission-aware Wiki.js discovery and content operations        | Provider permissions apply                 |
+| Wiki.js SDLC MCP server   | Permission-aware Wiki.js capability discovery                    | Discovery only; provider permissions apply |
 | Home Assistant MCP server | User-bound Home Assistant discovery and tool execution           | OIDC identity and per-user grants required |
 
 The Forgejo and Wiki.js HTTP servers support optional OIDC authentication and native TLS. Development can disable those features explicitly; test and production deployments should enable both. TLS is terminated by the Node server itself, preserving the path toward gateway-to-backend mTLS. The Home Assistant adapter remains OIDC-only because its grants are bound to a verified user identity.
