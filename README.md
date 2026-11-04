@@ -65,6 +65,7 @@ Use an external integration harness to test a complete identity-provider, gatewa
 
 - [Run and test an MCP server](docs/streamable-http.md)
 - [Secure deployment](docs/deployment-security.md)
+- [Manage container image retention](docs/package-retention.md)
 - [Documentation policy and style guide](docs/documentation.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
@@ -89,6 +90,8 @@ The repository uses the stable version in `VERSION` to create unique Semantic Ve
 The `release/<milestone-name>` branch is the milestone branch. Its name identifies the planned outcome, not a version. The `VERSION` file records the current intended SemVer version and can change without renaming the milestone branch. A `feature/*`, `bug/*`, or `hotfix/*` branch is a milestone change branch and must start from the applicable milestone branch. The counters make concurrent milestone change and milestone-branch images unique. Pull requests build, test, and scan the proposed merge without publishing another image version. Each published image records its source ref, source commit, CI/CD run, SBOM, maximum build provenance, and artifact attestation. Only a published stable release creates a stable image version. The release tag must match `VERSION`.
 
 Use a certified version or immutable digest in production. Use development, beta, and release-candidate versions only in their designated test stage.
+
+The [package-retention workflow](docs/package-retention.md) keeps five stable versions and applies separate development, beta, and release-candidate quotas to each active semantic-version line.
 
 ## Security and build evidence
 
