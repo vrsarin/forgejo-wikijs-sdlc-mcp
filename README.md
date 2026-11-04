@@ -53,7 +53,7 @@ make coverage
 make images
 ```
 
-The coverage command fails when aggregate line coverage is below 85%. It writes a Cobertura report to `.coverage/cobertura-coverage.xml`; CI uploads that report to GitHub Code Quality.
+The coverage command fails when aggregate line coverage is below 85%. It writes a Cobertura report to `.coverage/cobertura-coverage.xml`; CI stores that report as a workflow artifact for seven days.
 
 The repository includes a narrow Compose harness for testing the images over Streamable HTTP. It launches only the MCP servers; you supply the provider and identity services. Use the checked-in `.mcp.json` or `.vscode/mcp.json` as direct client examples after starting a server on ports 3010, 3011, or 3012.
 
