@@ -22,10 +22,10 @@ jobs:
       - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
-      - name: Check out the trusted base revision
+      - name: Check out the exact pull request revision
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Validate pull request metadata
         run: node scripts/validate-pr-changelog.mjs
