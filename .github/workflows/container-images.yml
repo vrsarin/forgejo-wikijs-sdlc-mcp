@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/container-images.yml"
+      - ".github/actions/setup-pinned-trivy/action.yml"
       - ".github/dependabot.yml"
       - ".dockerignore"
       - "VERSION"
@@ -16,6 +17,7 @@ on:
     branches: ["**"]
     paths:
       - ".github/workflows/container-images.yml"
+      - ".github/actions/setup-pinned-trivy/action.yml"
       - ".dockerignore"
       - "VERSION"
       - "scripts/resolve-image-version.mjs"
@@ -137,6 +139,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - uses: ./.github/actions/setup-pinned-trivy
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Build the image being scanned
@@ -158,6 +161,7 @@ jobs:
           ignore-unfixed: false
           severity: HIGH,CRITICAL
           scanners: vuln
+          skip-setup-trivy: true
       - name: Scan image for secrets
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
@@ -165,6 +169,7 @@ jobs:
           format: table
           exit-code: "1"
           scanners: secret
+          skip-setup-trivy: true
       - name: Create image SARIF report
         if: always()
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
@@ -176,6 +181,7 @@ jobs:
           ignore-unfixed: false
           severity: HIGH,CRITICAL
           scanners: vuln,secret
+          skip-setup-trivy: true
       - name: Upload image scan artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -209,6 +215,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - uses: ./.github/actions/setup-pinned-trivy
       - uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           scan-type: config
@@ -217,6 +224,7 @@ jobs:
           format: table
           exit-code: "1"
           severity: HIGH,CRITICAL
+          skip-setup-trivy: true
       - name: Create configuration SARIF report
         if: always()
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
@@ -228,6 +236,7 @@ jobs:
           output: trivy-container-configuration.sarif
           exit-code: "0"
           severity: HIGH,CRITICAL
+          skip-setup-trivy: true
       - name: Upload configuration scan artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

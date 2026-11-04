@@ -1,0 +1,34 @@
+name: Setup pinned Trivy
+description: Install a checksum-pinned Trivy release directly from GitHub
+
+runs:
+  using: composite
+  steps:
+    - name: Install Trivy v0.70.0
+      shell: bash
+      env:
+        TRIVY_ARCHIVE_SHA256: 8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9
+        TRIVY_VERSION: 0.70.0
+      run: |
+        set -euo pipefail
+
+        archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+        download_dir="$(mktemp -d "${RUNNER_TEMP}/trivy-download.XXXXXX")"
+        install_dir="${RUNNER_TEMP}/trivy-bin"
+        trap 'rm -rf "${download_dir}"' EXIT
+
+        curl --fail --location --proto '=https' --tlsv1.2 \
+          --output "${download_dir}/${archive}" \
+          "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${archive}"
+        printf '%s  %s\n' \
+          "${TRIVY_ARCHIVE_SHA256}" \
+          "${download_dir}/${archive}" | sha256sum --check --strict
+
+        mkdir -p "${install_dir}"
+        tar --extract --gzip \
+          --file "${download_dir}/${archive}" \
+          --directory "${install_dir}" \
+          trivy
+        chmod 0755 "${install_dir}/trivy"
+        "${install_dir}/trivy" --version
+        printf '%s\n' "${install_dir}" >> "${GITHUB_PATH}"
