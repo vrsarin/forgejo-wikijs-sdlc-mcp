@@ -139,6 +139,8 @@ export class HomeAssistantOAuth {
     })
     if (!response.ok) throw new Error(`Home Assistant identity verification failed (HTTP ${response.status})`)
     const result = await boundedJson(response)
+    // This digest is a deterministic OIDC subject identifier shared with Home Assistant, not a password verifier.
+    // codeql[js/insufficient-password-hash]
     const expected = createHash('sha256').update(`${this.#options.issuer.replace(/\/$/, '')}.${subject}`).digest('hex')
     if (!Array.isArray(result.oidc_subject_hashes) || !result.oidc_subject_hashes.includes(expected)) {
       throw new Error('Home Assistant account does not match the Keycloak user')

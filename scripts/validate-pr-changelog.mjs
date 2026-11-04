@@ -8,6 +8,26 @@ const titlePattern = /^(feat|fix|perf|refactor|docs|build|ci|test|chore|revert)(
 const entryPattern = /^[-*]\s+(Added|Changed|Fixed|Security|Deprecated|Removed|Internal):\s+(.+)$/
 const placeholderPattern = /^(none|n\/?a|not applicable|no changelog|no changes?|no user-visible changes?|tbd|todo|describe\b.*)$/i
 
+function stripHtmlComments(value) {
+  let result = ''
+  let cursor = 0
+
+  while (cursor < value.length) {
+    const start = value.indexOf('<!--', cursor)
+    if (start === -1) {
+      result += value.slice(cursor)
+      break
+    }
+    result += value.slice(cursor, start)
+    const end = value.indexOf('-->', start + 4)
+    if (end === -1) return undefined
+    cursor = end + 3
+  }
+
+  if (result.includes('<!--') || result.includes('-->')) return undefined
+  return result
+}
+
 export function validatePullRequest({ title = '', body = '' }) {
   const errors = []
   const normalizedTitle = title.trim()
@@ -27,7 +47,12 @@ export function validatePullRequest({ title = '', body = '' }) {
     return errors
   }
 
-  const section = changelogMatch[1].replaceAll(/<!--[\s\S]*?-->/g, '').trim()
+  const uncommentedSection = stripHtmlComments(changelogMatch[1])
+  if (uncommentedSection === undefined) {
+    errors.push('Use complete, non-overlapping HTML comments in the Changelog section')
+    return errors
+  }
+  const section = uncommentedSection.trim()
   const bulletLines = section
     .split(/\r?\n/)
     .map((line) => line.trim())

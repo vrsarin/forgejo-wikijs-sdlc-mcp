@@ -19,6 +19,26 @@ test('accepts internal entries for changes without user-visible behavior', () =>
   assert.deepEqual(errors, [])
 })
 
+test('removes complete HTML comments without exposing hidden changelog text', () => {
+  const errors = validatePullRequest({
+    title: 'fix(repository): validate changelog comments safely',
+    body: '## Changelog\n\n<!-- template guidance -->\n- Fixed: Changelog comment parsing rejects ambiguous input.'
+  })
+  assert.deepEqual(errors, [])
+})
+
+test('rejects incomplete or overlapping HTML comment markers', () => {
+  for (const body of [
+    '## Changelog\n\n<!-- unclosed\n- Fixed: Hidden changelog entry.',
+    '## Changelog\n\n<!----><!-- -->-->\n- Fixed: Ambiguous changelog entry.'
+  ]) {
+    assert.match(validatePullRequest({
+      title: 'fix(repository): reject ambiguous changelog comments',
+      body
+    })[0], /complete, non-overlapping HTML comments/)
+  }
+})
+
 test('rejects an invalid title and a missing changelog section', () => {
   const errors = validatePullRequest({
     title: 'Update things',
