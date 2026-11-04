@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { validatePullRequest } from './validate-pr-changelog.mjs'
+import { isTrustedDependencyBot, validatePullRequest } from './validate-pr-changelog.mjs'
 
 test('accepts a conventional title and categorized changelog entry', () => {
   const errors = validatePullRequest({
@@ -61,4 +61,17 @@ test('requires a specific explanation for an internal change', () => {
     body: '## Changelog\n\n- Internal: No user-visible changes.'
   })
   assert.equal(errors.length, 1)
+})
+
+test('trusts only same-repository Dependabot pull requests', () => {
+  const pullRequest = {
+    user: { login: 'dependabot[bot]' },
+    head: { ref: 'dependabot/npm_and_yarn/jose-6.2.14', repo: { full_name: 'o/r' } },
+    base: { repo: { full_name: 'o/r' } }
+  }
+  assert.equal(isTrustedDependencyBot(pullRequest), true)
+  assert.equal(isTrustedDependencyBot({ ...pullRequest, user: { login: 'someone' } }), false)
+  assert.equal(isTrustedDependencyBot({ ...pullRequest, head: { ...pullRequest.head, repo: { full_name: 'fork/r' } } }), false)
+  assert.equal(isTrustedDependencyBot({ ...pullRequest, head: { ...pullRequest.head, ref: 'feature/x' } }), false)
+  assert.equal(isTrustedDependencyBot(undefined), false)
 })
