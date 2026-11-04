@@ -53,9 +53,9 @@ jobs:
 
   coverage:
     name: Upload coverage
-    if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.base_ref == 'main')
+    # Bootstrap GitHub Code Quality from the default branch. Pull requests still
+    # enforce the local coverage threshold in the required test job above.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 10
