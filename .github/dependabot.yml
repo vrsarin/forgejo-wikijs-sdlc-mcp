@@ -17,11 +17,16 @@ updates:
       interval: weekly
     commit-message:
       prefix: "build(deps)"
+    # One grouped pull request per week avoids package-lock.json conflicts
+    # between sibling Dependabot pull requests.
+    groups:
+      npm-minor-and-patch:
+        update-types: ["minor", "patch"]
     ignore:
       # typescript-eslint supports TypeScript below 6.1 only.
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
-      # Match the Node.js 22 engine floor and runtime.
+      # Review @types/node majors manually; they must match the Node.js runtime.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
