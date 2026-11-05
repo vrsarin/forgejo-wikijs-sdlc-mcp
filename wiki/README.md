@@ -15,6 +15,7 @@ This wiki is an independent user and developer guide for the MCP servers in this
 - [Set up local development](developers/local-development.md)
 - [Add a provider](developers/adding-a-provider.md)
 - [Run tests](developers/testing.md)
+- [Publish to GitHub Wiki](developers/publishing.md)
 
 ## Reference and support
 
@@ -22,3 +23,5 @@ This wiki is an independent user and developer guide for the MCP servers in this
 - [Troubleshooting](troubleshooting/common-issues.md)
 
 The wiki describes the behavior of the current code. Confirm configuration defaults and provider capabilities against the source before applying them to a deployment.
+
+The GitHub Wiki is published from this directory. See [Publish to GitHub Wiki](developers/publishing.md) for the setup and sync behavior.
