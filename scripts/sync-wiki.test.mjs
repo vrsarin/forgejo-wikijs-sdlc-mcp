@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import test from 'node:test'
+import { promisify } from 'node:util'
 
 import { buildWikiPages, syncWikiPages } from './sync-wiki.mjs'
+
+const execute = promisify(execFile)
 
 async function withTemporaryDirectory(run) {
   const directory = await mkdtemp(resolve(tmpdir(), 'sdlc-wiki-test-'))
@@ -64,6 +68,100 @@ test('rejects broken internal wiki links', async () => {
     await assert.rejects(buildWikiPages(source, resolve(directory, 'generated'), { repository: 'owner/repo' }), /Wiki page link does not exist/)
   })
 })
+
+  test('preserves optional Markdown link titles when rewriting page and repository links', async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const source = resolve(directory, 'wiki')
+      const generated = resolve(directory, 'generated')
+      await mkdir(resolve(source, 'users'), { recursive: true })
+      await writeFile(resolve(source, 'README.md'), [
+        '# Wiki',
+        '[Guide](users/guide.md "Guide title")',
+        "[Guide](users/guide.md#setup 'Setup title')",
+        '[Guide](users/guide.md (Parenthesized title))',
+        '[Contributing](../CONTRIBUTING.md "Contributing title")',
+        '[External](https://example.com "External title")',
+        ''
+      ].join('\n'))
+      await writeFile(resolve(source, 'users/guide.md'), '# Guide\n')
+
+      await buildWikiPages(source, generated, { repository: 'owner/repo' })
+
+      assert.equal(await readFile(resolve(generated, 'Home.md'), 'utf8'), [
+        '# Wiki',
+        '[Guide](MCP-Users-Guide "Guide title")',
+        "[Guide](MCP-Users-Guide#setup 'Setup title')",
+        '[Guide](MCP-Users-Guide (Parenthesized title))',
+        '[Contributing](https://github.com/owner/repo/blob/main/CONTRIBUTING.md "Contributing title")',
+        '[External](https://example.com "External title")',
+        ''
+      ].join('\n'))
+    })
+  })
+
+  test('rejects reused output directories without retaining stale pages in a new build', async () => {
+    await withTemporaryDirectory(async (directory) => {
+      const source = resolve(directory, 'wiki')
+      const generated = resolve(directory, 'generated')
+      await mkdir(resolve(source, 'users'), { recursive: true })
+      await writeFile(resolve(source, 'README.md'), '# Wiki\n')
+      await writeFile(resolve(source, 'users/old.md'), '# Old guide\n')
+      await buildWikiPages(source, generated, { repository: 'owner/repo' })
+      await rm(resolve(source, 'users/old.md'))
+
+      await assert.rejects(buildWikiPages(source, generated, { repository: 'owner/repo' }), /Use a fresh directory/)
+      const fresh = resolve(directory, 'fresh')
+      await buildWikiPages(source, fresh, { repository: 'owner/repo' })
+      await assert.rejects(readFile(resolve(fresh, 'MCP-Users-Old.md')), { code: 'ENOENT' })
+    })
+  })
+
+  test('workflow stages ownership manifest even when Wiki gitignore hides dotfiles', async () => {
+    const workflow = await readFile(new URL('../.github/workflows/publish-wiki.yml', import.meta.url), 'utf8')
+    const stagingStart = workflow.indexOf('          git add --all\n')
+    const stagingEnd = workflow.indexOf('          if git diff --cached --quiet;', stagingStart)
+    assert.ok(stagingStart >= 0 && stagingEnd > stagingStart)
+    const stagingScript = workflow.slice(stagingStart, stagingEnd)
+
+    await withTemporaryDirectory(async (directory) => {
+      await execute('git', ['init', '--quiet', directory])
+      await writeFile(resolve(directory, '.gitignore'), '.*\n*.md\n')
+      await writeFile(resolve(directory, '.sdlc-mcp-managed-pages'), 'Home.md\n_Sidebar.md\n')
+      await writeFile(resolve(directory, 'Home.md'), '# Home\n')
+      await writeFile(resolve(directory, '_Sidebar.md'), 'Navigation\n')
+
+      await execute('bash', ['-e', '-c', stagingScript], { cwd: directory })
+
+      const { stdout } = await execute('git', ['diff', '--cached', '--name-only'], { cwd: directory })
+      assert.deepEqual(stdout.trim().split('\n').sort(), ['.sdlc-mcp-managed-pages', 'Home.md', '_Sidebar.md'].sort())
+    })
+  })
+
+  test('rejects unmanaged sidebars and identical pages before changing the Wiki', async () => {
+    for (const unmanagedPage of ['_Sidebar.md', 'MCP-Users-Guide.md']) {
+      await withTemporaryDirectory(async (directory) => {
+        const generated = resolve(directory, 'generated')
+        const wiki = resolve(directory, 'wiki-repository')
+        await mkdir(generated)
+        await mkdir(wiki)
+        await writeFile(resolve(generated, 'Home.md'), 'New home\n')
+        await writeFile(resolve(generated, '_Sidebar.md'), 'Generated sidebar\n')
+        await writeFile(resolve(generated, 'MCP-Users-Guide.md'), 'Identical guide\n')
+        await writeFile(resolve(wiki, 'Home.md'), 'Original home\n')
+        const content = unmanagedPage === '_Sidebar.md' ? 'Custom navigation\n' : 'Identical guide\n'
+        await writeFile(resolve(wiki, unmanagedPage), content)
+        await writeFile(resolve(wiki, 'MCP-Users-Old.md'), 'Old managed guide\n')
+        await writeFile(resolve(wiki, '.sdlc-mcp-managed-pages'), 'MCP-Users-Old.md\n')
+
+        await assert.rejects(syncWikiPages(generated, wiki), /unmanaged GitHub Wiki page/)
+
+        assert.equal(await readFile(resolve(wiki, unmanagedPage), 'utf8'), content)
+        assert.equal(await readFile(resolve(wiki, 'Home.md'), 'utf8'), 'Original home\n')
+        assert.equal(await readFile(resolve(wiki, 'MCP-Users-Old.md'), 'utf8'), 'Old managed guide\n')
+        assert.equal(await readFile(resolve(wiki, '.sdlc-mcp-managed-pages'), 'utf8'), 'MCP-Users-Old.md\n')
+      })
+    }
+  })
 
 test('syncs managed pages, preserves unrelated pages, and prunes only stale managed pages', async () => {
   await withTemporaryDirectory(async (directory) => {

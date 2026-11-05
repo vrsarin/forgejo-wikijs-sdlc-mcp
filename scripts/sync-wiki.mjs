@@ -36,7 +36,7 @@ function safeRepositoryPath(path, root) {
 }
 
 function rewriteLinks(content, sourcePath, sourceRoot, repository, branch, pageNames) {
-  return content.replace(/(\]\()([^\s)]+)(\))/g, (match, prefix, target, suffix) => {
+  return content.replace(/(\]\()([^\s)]+)((?:\s+(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\((?:\\.|[^)\\])*\)))?\s*\))/g, (match, prefix, target, suffix) => {
     if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target)) return match
     const parsed = target.match(/^([^?#]+)(\?[^#]*)?(#.*)?$/)
     if (!parsed || !parsed[1].endsWith('.md')) return match
@@ -74,6 +74,9 @@ export async function buildWikiPages(sourceRoot, outputRoot, { repository, branc
   if (!pageNames.has('README.md')) throw new Error('wiki/README.md is required to build the GitHub Wiki home page')
 
   await mkdir(outputRoot, { recursive: true })
+  if ((await readdir(outputRoot)).length !== 0) {
+    throw new Error('Wiki output directory must be empty. Use a fresh directory for each build.')
+  }
   const sections = new Map()
   for (const sourcePath of sourceFiles) {
     const content = await readFile(resolve(sourceRoot, sourcePath), 'utf8')
@@ -158,12 +161,8 @@ export async function syncWikiPages(generatedRoot, wikiRoot) {
     throw new Error(`The ${managedManifest} file contains an invalid managed-page entry`)
   }
 
-  const generatedSet = new Set(generatedFiles)
-  for (const staleFile of previousFiles.filter((file) => !generatedSet.has(file))) {
-    await rm(resolve(wikiRoot, staleFile), { force: true })
-  }
-
   const previousSet = new Set(previousFiles)
+  const pages = new Map()
   for (const file of generatedFiles) {
     const destination = resolve(wikiRoot, file)
     let existing
@@ -173,10 +172,18 @@ export async function syncWikiPages(generatedRoot, wikiRoot) {
       if (error.code !== 'ENOENT') throw error
     }
     const generated = await readRegularFile(resolve(generatedRoot, file))
-    if (existing && !previousSet.has(file) && file !== 'Home.md' && file !== '_Sidebar.md' && !existing.equals(generated)) {
+    if (existing && !previousSet.has(file) && file !== 'Home.md') {
       throw new Error(`Refusing to overwrite an unmanaged GitHub Wiki page: ${file}`)
     }
-    await writeRegularFile(destination, generated)
+    pages.set(file, generated)
+  }
+
+  const generatedSet = new Set(generatedFiles)
+  for (const staleFile of previousFiles.filter((file) => !generatedSet.has(file))) {
+    await rm(resolve(wikiRoot, staleFile), { force: true })
+  }
+  for (const [file, generated] of pages) {
+    await writeRegularFile(resolve(wikiRoot, file), generated)
   }
 
   await writeRegularFile(resolve(wikiRoot, managedManifest), `${generatedFiles.join('\n')}\n`)

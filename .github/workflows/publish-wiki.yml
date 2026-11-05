@@ -58,6 +58,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
+          git add -f -- .sdlc-mcp-managed-pages
           while IFS= read -r page; do
             git add -f -- "$page"
           done < .sdlc-mcp-managed-pages
