@@ -59,12 +59,21 @@ function classifyVersion(version) {
   return { release: parsed[0] }
 }
 
-function compareSemanticVersionDescending(left, right) {
+function compareSemanticVersions(left, right) {
   for (let index = 0; index < 3; index += 1) {
-    if (left.release.semanticVersion[index] !== right.release.semanticVersion[index]) {
-      return right.release.semanticVersion[index] - left.release.semanticVersion[index]
+    if (left[index] !== right[index]) {
+      return left[index] - right[index]
     }
   }
+  return 0
+}
+
+function compareSemanticVersionDescending(left, right) {
+  const semanticDifference = compareSemanticVersions(
+    left.release.semanticVersion,
+    right.release.semanticVersion
+  )
+  if (semanticDifference !== 0) return -semanticDifference
   return compareRecencyDescending(left, right)
 }
 
@@ -110,7 +119,7 @@ export function planPackageRetention(versions, retention = defaultRetention) {
   const stable = classified
     .filter((entry) => entry.release.stage === 'stable')
     .sort(compareSemanticVersionDescending)
-  const stableBases = new Set(stable.map((entry) => entry.release.base))
+  const newestStableVersion = stable[0]?.release.semanticVersion
   const keep = stable
     .slice(0, retention.stable)
     .map((entry) => decision(entry, 'keep', `one of the newest ${retention.stable} stable releases`))
@@ -129,11 +138,14 @@ export function planPackageRetention(versions, retention = defaultRetention) {
   for (const group of prereleaseGroups.values()) {
     group.sort(compareRecencyDescending)
     const { base, stage } = group[0].release
-    if (stableBases.has(base)) {
+    if (
+      newestStableVersion &&
+      compareSemanticVersions(newestStableVersion, group[0].release.semanticVersion) >= 0
+    ) {
       remove.push(...group.map((entry) => decision(
         entry,
         'delete',
-        `stable release ${base} is available`
+        `stable release ${stable[0].release.base} supersedes ${base}`
       )))
       continue
     }
