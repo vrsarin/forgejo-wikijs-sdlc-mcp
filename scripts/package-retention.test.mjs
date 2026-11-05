@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import { parseImageTag, planPackageRetention } from './package-retention.mjs'
@@ -66,6 +67,38 @@ test('purges older prerelease trains after a newer stable release', () => {
   assert.equal(deletedTags.has('1.0.2-beta.42.1'), true)
   assert.equal(deletedTags.has('1.0.2-rc.46.1'), true)
   assert.equal(plan.keep.some((item) => item.tags.includes('1.0.4-dev.47.1')), true)
+})
+
+test('purges superseded prereleases even when they were published after the stable release', () => {
+  const versions = [
+    version(1, '1.0.4'),
+    version(2, '1.0.4-dev.57.1'),
+    version(3, '1.0.4-rc.59.1'),
+    version(4, '1.0.3-beta.60.1'),
+    version(5, '1.0.5-dev.61.1'),
+    version(6, '1.0.5-beta.62.1'),
+    version(7, '1.0.5-rc.63.1')
+  ]
+  const plan = planPackageRetention(versions)
+
+  assert.deepEqual(plan.delete.map((item) => item.id).sort(), [2, 3, 4])
+  assert.deepEqual(plan.keep.map((item) => item.id).sort(), [1, 5, 6, 7])
+  assert.equal(plan.protected.length, 0)
+})
+
+test('applies retention after every successful image publication, not just releases', () => {
+  const workflow = readFileSync(
+    new URL('../.github/workflows/container-images.yml', import.meta.url),
+    'utf8'
+  )
+  const steps = workflow.split(/^ {6}- /m)
+  const retentionIndex = steps.findIndex((step) => step.startsWith('name: Remove superseded package versions\n'))
+  assert.ok(retentionIndex > 0, 'publication must include a retention step')
+  const retentionStep = steps[retentionIndex]
+
+  assert.doesNotMatch(retentionStep, /^\s+if:/m, 'retention must not be restricted to release events')
+  assert.match(retentionStep, /run: node scripts\/package-retention\.mjs --apply/)
+  assert.match(steps[retentionIndex - 1], /^name: Attest image provenance\n/)
 })
 
 test('applies stage quotas independently to parallel release trains', () => {

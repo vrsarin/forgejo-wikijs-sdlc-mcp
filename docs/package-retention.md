@@ -39,4 +39,12 @@ The preview is complete when the workflow succeeds without deleting a package ve
 4. Run the workflow.
 5. Confirm that the workflow summary reports no deletion failure.
 
-The scheduled workflow applies the policy every Monday at 04:30 UTC. A successfully published stable release also applies the policy after its image and provenance attestation are available.
+The scheduled workflow applies the policy every Monday at 04:30 UTC. Every successful image publication also applies the policy after its image and provenance attestation are available. Pull-request runs do not publish images or apply retention.
+
+## Prerelease tags remain after a stable release
+
+A branch that still uses the released `VERSION` can publish new development, beta, or release-candidate tags after the stable release cleanup. Retention removes these tags at the end of each successful publication, even when their creation date is newer than the stable image.
+
+Set `VERSION` to the next intended release on the milestone branch and synchronize its change branches before publishing images for the next milestone. Prereleases must have a semantic version newer than the newest stable image to remain available.
+
+If superseded tags remain after publication, check the **Remove superseded package versions** step in the **Container images** workflow. Run a manual retention preview to inspect existing tags and deletion decisions. Untagged manifests and unknown tags, including `sha256-` attestation tags, remain protected.
