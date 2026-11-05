@@ -63,6 +63,7 @@ Use an external integration harness to test a complete identity-provider, gatewa
 
 ## Documentation
 
+- [Project wiki](wiki/README.md)
 - [Run and test an MCP server](docs/streamable-http.md)
 - [Secure deployment](docs/deployment-security.md)
 - [Manage container image retention](docs/package-retention.md)
