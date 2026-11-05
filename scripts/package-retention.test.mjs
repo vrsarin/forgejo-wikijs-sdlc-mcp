@@ -7,7 +7,13 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import test from 'node:test'
 
-import { parseImageTag, planPackageRetention } from './package-retention.mjs'
+import {
+  applyRetentionPlan,
+  parseImageTag,
+  planManifestRetention,
+  planPackageRetention,
+  registryManifestReader
+} from './package-retention.mjs'
 
 function version(id, tag, createdAt) {
   return {
@@ -134,9 +140,286 @@ test('protects untagged, unknown, and multi-identity versions', () => {
   assert.equal(plan.protected.length, 3)
 })
 
-async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200 } = {}) {
+function digest(id) {
+  return `sha256:${id.toString(16).padStart(64, '0')}`
+}
+
+function imageManifest(subject) {
+  return {
+    schemaVersion: 2,
+    mediaType: 'application/vnd.oci.image.manifest.v1+json',
+    config: { digest: digest(1000) },
+    layers: [],
+    ...(subject ? { subject: { digest: subject } } : {})
+  }
+}
+
+function manifestFixture() {
+  const versions = [
+    version(1, '1.0.4'),
+    version(2, '1.0.3-dev.42.1'),
+    version(3),
+    version(4),
+    version(5, digest(1).replace(':', '-')),
+    version(6, digest(2).replace(':', '-')),
+    version(7),
+    version(8),
+    version(9),
+    version(10),
+    version(11)
+  ].map((item) => ({ ...item, name: digest(item.id) }))
+  const index = (...ids) => ({
+    schemaVersion: 2,
+    mediaType: 'application/vnd.oci.image.index.v1+json',
+    manifests: ids.map((id) => ({ digest: digest(id) }))
+  })
+  const manifests = new Map([
+    [digest(1), index(3, 10)],
+    [digest(2), index(3, 4)],
+    [digest(3), imageManifest()],
+    [digest(4), imageManifest()],
+    [digest(5), index(7)],
+    [digest(6), index(8)],
+    [digest(7), imageManifest()],
+    [digest(8), imageManifest()],
+    [digest(9), imageManifest()],
+    [digest(10), index(11)],
+    [digest(11), imageManifest()]
+  ])
+  return {
+    versions,
+    manifests,
+    read: async (name) => {
+      assert.ok(manifests.has(name), `unexpected manifest read: ${name}`)
+      return manifests.get(name)
+    },
+    now: Date.parse('2026-11-06T00:00:00Z')
+  }
+}
+
+test('deletes orphaned SHA and untagged versions but preserves the complete retained image graph', async () => {
+  const { versions, read, now } = manifestFixture()
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+
+  assert.deepEqual(plan.keep.map((item) => item.id), [1])
+  assert.deepEqual(plan.delete.map((item) => item.id).sort((a, b) => a - b), [2, 4, 6, 8, 9])
+  assert.deepEqual(plan.protected.map((item) => item.id).sort((a, b) => a - b), [3, 5, 7, 10, 11])
+})
+
+test('protects tagged dependencies even when the inventory contains no auxiliary versions', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  const snapshot = versions.slice(0, 2)
+  manifests.set(digest(1), {
+    ...manifests.get(digest(1)),
+    manifests: [{ digest: digest(2) }]
+  })
+  manifests.set(digest(2), imageManifest())
+  const plan = await planManifestRetention(snapshot, planPackageRetention(snapshot), read, now)
+
+  assert.deepEqual(plan.keep.map((item) => item.id), [1])
+  assert.deepEqual(plan.protected.map((item) => item.id), [2])
+  assert.equal(plan.delete.length, 0)
+})
+
+test('preserves listed children of an unlisted OCI subject index referenced by a retained artifact', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  manifests.set(digest(1), imageManifest(digest(999)))
+  manifests.set(digest(999), {
+    schemaVersion: 2,
+    mediaType: 'application/vnd.oci.image.index.v1+json',
+    manifests: [{ digest: digest(4) }]
+  })
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+
+  assert.ok(plan.protected.some((item) => item.id === 4))
+  assert.equal(plan.delete.some((item) => item.id === 4), false)
+})
+
+test('preserves dependencies of unknown tags and multi-identity versions', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  versions[8].metadata.container.tags = ['custom']
+  manifests.set(digest(9), {
+    ...manifests.get(digest(1)),
+    manifests: [{ digest: digest(4) }]
+  })
+  versions[9].metadata.container.tags = ['2.0.0', '2.0.1']
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+
+  for (const id of [4, 9, 10, 11]) {
+    assert.ok(plan.protected.some((item) => item.id === id))
+    assert.equal(plan.delete.some((item) => item.id === id), false)
+  }
+})
+
+test('resolves nested manifests even when a child is absent from the package API snapshot', async () => {
+  const { versions, read, now } = manifestFixture()
+  const snapshot = versions.filter((item) => item.id !== 10)
+  const plan = await planManifestRetention(snapshot, planPackageRetention(snapshot), read, now)
+
+  assert.ok(plan.protected.some((item) => item.id === 11))
+  assert.equal(plan.delete.some((item) => item.id === 11), false)
+})
+
+test('follows OCI subject links and digest-tagged signature attachments', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  manifests.set(digest(9), imageManifest(digest(1)))
+  versions[5].metadata.container.tags = [`${digest(1).replace(':', '-')}.sig`]
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+
+  for (const id of [6, 8, 9]) assert.ok(plan.protected.some((item) => item.id === id))
+})
+
+test('can remove an orphaned OCI attestation whose subject has already been deleted', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  manifests.set(digest(9), imageManifest(digest(999)))
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+
+  assert.ok(plan.delete.some((item) => item.id === 9))
+})
+
+test('does not fetch missing children of an orphaned index but fails for missing retained dependencies', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  manifests.get(digest(6)).manifests = [{ digest: digest(999) }]
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+  assert.ok(plan.delete.some((item) => item.id === 6))
+
+  manifests.get(digest(1)).manifests.push({ digest: digest(999) })
+  await assert.rejects(
+    planManifestRetention(versions, planPackageRetention(versions), read, now),
+    /unexpected manifest read/
+  )
+})
+
+test('removes stale orphaned API entries returning registry 404 but never retained or recent entries', async () => {
+  const { versions, read, now } = manifestFixture()
+  const missing = registryManifestReader('owner', 'package', 'test-token', async (url) =>
+    new URL(url).pathname === '/token'
+      ? new Response(JSON.stringify({ token: 'registry-token' }))
+      : new Response('', { status: 404 }))
+  const readWithMissing = async (name) => name === digest(9) ? missing(name) : read(name)
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), readWithMissing, now)
+  assert.ok(plan.delete.some((item) => item.id === 9))
+
+  versions[8].metadata.container.tags = ['custom']
+  await assert.rejects(
+    planManifestRetention(versions, planPackageRetention(versions), readWithMissing, now),
+    /manifest .* failed \(404\)/
+  )
+  versions[8].metadata.container.tags = []
+  versions[8].created_at = new Date(now).toISOString()
+  const recentPlan = await planManifestRetention(versions, planPackageRetention(versions), readWithMissing, now)
+  assert.ok(recentPlan.protected.some((item) => item.id === 9))
+  assert.equal(recentPlan.delete.some((item) => item.id === 9), false)
+})
+
+test('protects recent uploads and their dependencies until the 24-hour grace period ends', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  versions[5].created_at = new Date(now - 60_000).toISOString()
+  manifests.set(digest(6), {
+    ...manifests.get(digest(1)),
+    manifests: [{ digest: digest(8) }]
+  })
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+  assert.match(plan.protected.find((item) => item.id === 6).reason, /24-hour/)
+  assert.ok(plan.protected.some((item) => item.id === 8))
+
+  const expired = await planManifestRetention(
+    versions, planPackageRetention(versions), read, now + 24 * 60 * 60 * 1000
+  )
+  for (const id of [6, 8]) assert.ok(expired.delete.some((item) => item.id === id))
+})
+
+test('manifest lookup failures abort planning rather than treating unreadable manifests as orphans', async () => {
+  const { versions, now } = manifestFixture()
+  for (const status of [401, 403, 404, 429, 500]) {
+    await assert.rejects(planManifestRetention(
+      versions,
+      planPackageRetention(versions),
+      async () => { throw new Error(`GHCR failed (${status})`) },
+      now
+    ), new RegExp(`GHCR failed \\(${status}\\)`))
+  }
+})
+
+test('rejects invalid manifest metadata and unsupported manifest formats before deletion', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  manifests.set(digest(9), { schemaVersion: 2, mediaType: 'unknown' })
+  await assert.rejects(
+    planManifestRetention(versions, planPackageRetention(versions), read, now),
+    /Unsupported or malformed/
+  )
+  manifests.set(digest(9), imageManifest())
+  versions[8].created_at = 'invalid'
+  await assert.rejects(
+    planManifestRetention(versions, planPackageRetention(versions), read, now), /Invalid creation date/
+  )
+  versions[8].name = 'not-a-digest'
+  await assert.rejects(
+    planManifestRetention(versions, planPackageRetention(versions), read, now), /Invalid or missing manifest digest/
+  )
+})
+
+test('registry reader exchanges credentials once and reads manifests with a scoped bearer token', async () => {
+  const requests = []
+  const read = registryManifestReader('Test-Owner', 'Test-Package', 'test-token', async (url, options) => {
+    requests.push({ url: String(url), ...options })
+    return new Response(JSON.stringify(requests.length === 1 ? { token: 'registry-token' } : imageManifest()))
+  })
+  await Promise.all([read(digest(1)), read(digest(2))])
+
+  assert.equal(requests.length, 3)
+  assert.equal(new URL(requests[0].url).searchParams.get('scope'), 'repository:test-owner/test-package:pull')
+  assert.match(requests[0].headers.Authorization, /^Basic /)
+  assert.equal(requests[1].headers.Authorization, 'Bearer registry-token')
+  assert.equal(requests[2].url, `https://ghcr.io/v2/test-owner/test-package/manifests/${digest(2)}`)
+  assert.ok(requests.every((request) => request.redirect === 'error'))
+})
+
+test('registry reader preserves token and manifest failures', async () => {
+  for (const status of [401, 403, 404, 429, 500]) {
+    const tokenFailure = registryManifestReader('owner', 'package', 'test-token',
+      async () => new Response('', { status }))
+    await assert.rejects(tokenFailure(digest(1)), new RegExp(`token request failed \\(${status}\\)`))
+    const manifestFailure = registryManifestReader('owner', 'package', 'test-token',
+      async (url) => new URL(url).pathname === '/token'
+        ? new Response(JSON.stringify({ token: 'registry-token' }))
+        : new Response('', { status }))
+    await assert.rejects(manifestFailure(digest(1)), new RegExp(`manifest .* failed \\(${status}\\)`))
+  }
+  const missingToken = registryManifestReader('owner', 'package', 'test-token',
+    async () => new Response('{}'))
+  await assert.rejects(missingToken(digest(1)), /no registry token/)
+})
+
+test('deletes release versions before their orphaned manifests', async () => {
+  const { versions, read, now } = manifestFixture()
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+  plan.delete.reverse()
+  const deleted = []
+  await applyRetentionPlan(plan, async (item) => { deleted.push(item.id) })
+
+  assert.equal(deleted[0], 2)
+  assert.deepEqual(deleted.slice(1).sort((a, b) => a - b), [4, 6, 8, 9])
+})
+
+test('does not delete orphan candidates when deleting a release version fails', async () => {
+  const { versions, read, now } = manifestFixture()
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+  const attempted = []
+  await assert.rejects(applyRetentionPlan(plan, async (item) => {
+    attempted.push(item.id)
+    throw new Error('Deletion denied')
+  }), /Package retention completed with failures:\nDeletion denied/)
+
+  assert.deepEqual(attempted, [2])
+})
+
+async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200, retainedChild = false } = {}) {
   const requests = []
   const versionsPath = '/users/test-owner/packages/container/test-package/versions'
+  const versions = [
+    version(1, '1.0.4'), version(2, '1.0.4-dev.57.1'), version(3, '1.0.4-rc.59.1')
+  ].map((item) => ({ ...item, name: digest(item.id) }))
   const server = createServer((request, response) => {
     requests.push(`${request.method} ${request.url}`)
     response.setHeader('Content-Type', 'application/json')
@@ -145,8 +428,17 @@ async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200 } = {
     } else if (request.method === 'GET' && request.url === `${versionsPath}?per_page=100&page=1`) {
       response.statusCode = getStatus
       response.end(JSON.stringify(getStatus === 200
-        ? [version(1, '1.0.4'), version(2, '1.0.4-dev.57.1'), version(3, '1.0.4-rc.59.1')]
+        ? versions
         : { message: 'Cannot list package versions' }))
+    } else if (request.method === 'GET' && request.url.startsWith('/token?')) {
+      response.end(JSON.stringify({ token: 'test-registry-token' }))
+    } else if (request.method === 'GET' &&
+      versions.some((item) => request.url === `/v2/test-owner/test-package/manifests/${item.name}`)) {
+      response.end(JSON.stringify(retainedChild && request.url.endsWith(digest(1)) ? {
+        schemaVersion: 2,
+        mediaType: 'application/vnd.oci.image.index.v1+json',
+        manifests: [{ digest: digest(2) }]
+      } : imageManifest()))
     } else if (request.method === 'DELETE' && [`${versionsPath}/2`, `${versionsPath}/3`].includes(request.url)) {
       response.statusCode = deleteStatus(request.url)
       response.end(response.statusCode === 204 ? undefined : JSON.stringify({ message: 'Delete response' }))
@@ -164,6 +456,16 @@ async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200 } = {
   return {
     requests,
     run: () => promisify(execFile)(process.execPath, [
+      '--import',
+      `data:text/javascript,${encodeURIComponent(`
+        const originalFetch = globalThis.fetch
+        globalThis.fetch = (input, options) => {
+          const url = new URL(input)
+          return originalFetch(url.hostname === 'ghcr.io'
+            ? process.env.GITHUB_API_URL + url.pathname + url.search
+            : input, options)
+        }
+      `)}`,
       fileURLToPath(new URL('./package-retention.mjs', import.meta.url)),
       '--apply'
     ], {
@@ -179,6 +481,18 @@ async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200 } = {
     })
   }
 }
+
+test('CLI never deletes a prerelease manifest referenced by the retained stable image', async (t) => {
+  const api = await retentionApi(t, { retainedChild: true })
+  const { stdout, stderr } = await api.run()
+
+  assert.equal(stderr, '')
+  assert.match(stdout, /referenced by a retained image/)
+  assert.deepEqual(api.requests.filter((request) => request.startsWith('DELETE ')), [
+    'DELETE /users/test-owner/packages/container/test-package/versions/3'
+  ])
+  assert.ok(api.requests.some((request) => request.startsWith('GET /v2/')))
+})
 
 test('overlapping cleanup runs succeed when a version has already been deleted', async (t) => {
   const removed = new Set()
