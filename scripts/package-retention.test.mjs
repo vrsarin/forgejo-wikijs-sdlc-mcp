@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
+import { once } from 'node:events'
 import { readFileSync } from 'node:fs'
+import { createServer } from 'node:http'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 import test from 'node:test'
 
 import { parseImageTag, planPackageRetention } from './package-retention.mjs'
@@ -127,4 +132,97 @@ test('protects untagged, unknown, and multi-identity versions', () => {
 
   assert.equal(plan.delete.length, 0)
   assert.equal(plan.protected.length, 3)
+})
+
+async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200 } = {}) {
+  const requests = []
+  const versionsPath = '/users/test-owner/packages/container/test-package/versions'
+  const server = createServer((request, response) => {
+    requests.push(`${request.method} ${request.url}`)
+    response.setHeader('Content-Type', 'application/json')
+    if (request.method === 'GET' && request.url === '/users/test-owner') {
+      response.end(JSON.stringify({ type: 'User' }))
+    } else if (request.method === 'GET' && request.url === `${versionsPath}?per_page=100&page=1`) {
+      response.statusCode = getStatus
+      response.end(JSON.stringify(getStatus === 200
+        ? [version(1, '1.0.4'), version(2, '1.0.4-dev.57.1'), version(3, '1.0.4-rc.59.1')]
+        : { message: 'Cannot list package versions' }))
+    } else if (request.method === 'DELETE' && [`${versionsPath}/2`, `${versionsPath}/3`].includes(request.url)) {
+      response.statusCode = deleteStatus(request.url)
+      response.end(response.statusCode === 204 ? undefined : JSON.stringify({ message: 'Delete response' }))
+    } else {
+      response.statusCode = 500
+      response.end(JSON.stringify({ message: 'Unexpected request' }))
+    }
+  })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  t.after(() => new Promise((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve())
+  }))
+
+  return {
+    requests,
+    run: () => promisify(execFile)(process.execPath, [
+      fileURLToPath(new URL('./package-retention.mjs', import.meta.url)),
+      '--apply'
+    ], {
+      timeout: 10_000,
+      env: {
+        ...process.env,
+        GITHUB_API_URL: `http://127.0.0.1:${server.address().port}`,
+        GITHUB_TOKEN: 'test-token',
+        PACKAGE_OWNER: 'test-owner',
+        PACKAGE_NAME: 'test-package',
+        GITHUB_STEP_SUMMARY: ''
+      }
+    })
+  }
+}
+
+test('overlapping cleanup runs succeed when a version has already been deleted', async (t) => {
+  const removed = new Set()
+  const api = await retentionApi(t, {
+    deleteStatus: (path) => {
+      if (removed.has(path)) return 404
+      removed.add(path)
+      return 204
+    }
+  })
+  const results = await Promise.all([api.run(), api.run()])
+
+  assert.equal(removed.size, 2)
+  assert.equal(api.requests.filter((request) => request.startsWith('DELETE ')).length, 4)
+  assert.equal(results.every(({ stderr }) => stderr === ''), true)
+  const output = results.map(({ stdout }) => stdout).join('\n')
+  assert.equal(output.match(/Package version already absent \(404\)/g)?.length, 2)
+  assert.equal(output.match(/Ensured package version \d+ is absent/g)?.length, 4)
+})
+
+for (const status of [401, 403, 429, 500]) {
+  test(`deletion errors (${status}) still fail cleanup and do not stop remaining deletions`, async (t) => {
+    const api = await retentionApi(t, {
+      deleteStatus: (path) => path.endsWith('/2') ? status : 204
+    })
+
+    await assert.rejects(api.run(), (error) => {
+      assert.equal(error.code, 1)
+      assert.match(error.stderr, /Package retention completed with failures/)
+      assert.ok(error.stderr.includes(`failed (${status})`))
+      assert.match(error.stdout, /Ensured package version 3 is absent/)
+      return true
+    })
+    assert.equal(api.requests.filter((request) => request.startsWith('DELETE ')).length, 2)
+  })
+}
+
+test('a 404 while listing package versions remains fatal', async (t) => {
+  const api = await retentionApi(t, { getStatus: 404 })
+
+  await assert.rejects(api.run(), (error) => {
+    assert.equal(error.code, 1)
+    assert.match(error.stderr, /GitHub Packages API GET .*failed \(404\)/)
+    return true
+  })
+  assert.equal(api.requests.some((request) => request.startsWith('DELETE ')), false)
 })
