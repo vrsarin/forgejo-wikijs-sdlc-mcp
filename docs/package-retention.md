@@ -41,6 +41,8 @@ The preview is complete when the workflow succeeds without deleting a package ve
 
 The scheduled workflow applies the policy every Monday at 04:30 UTC. Every successful image publication also applies the policy after its image and provenance attestation are available. Pull-request runs do not publish images or apply retention.
 
+Cleanup runs can overlap across branches or workflows. If another run already deleted a selected version, a deletion response of HTTP 404 is logged as already absent and succeeds. Other API errors still fail cleanup; a 404 while listing package versions is also fatal.
+
 ## Prerelease tags remain after a stable release
 
 A branch that still uses the released `VERSION` can publish new development, beta, or release-candidate tags after the stable release cleanup. Retention removes these tags at the end of each successful publication, even when their creation date is newer than the stable image.

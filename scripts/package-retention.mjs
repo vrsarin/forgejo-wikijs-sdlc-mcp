@@ -188,6 +188,10 @@ function apiClient(token) {
         'X-GitHub-Api-Version': '2022-11-28'
       }
     })
+    if (method === 'DELETE' && response.status === 404) {
+      console.log(`Package version already absent (404): ${path}`)
+      return
+    }
     if (!response.ok) {
       const detail = (await response.text()).slice(0, 500)
       throw new Error(`GitHub Packages API ${method} ${path} failed (${response.status}): ${detail}`)
@@ -250,7 +254,7 @@ async function main() {
     const path = `/${scope}/${encodeURIComponent(owner)}/packages/container/${encodeURIComponent(packageName)}/versions/${version.id}`
     try {
       await request(path, { method: 'DELETE' })
-      console.log(`Deleted package version ${version.id}: ${version.tags.join(', ')}`)
+      console.log(`Ensured package version ${version.id} is absent: ${version.tags.join(', ')}`)
     } catch (error) {
       failures.push(error instanceof Error ? error.message : String(error))
     }
