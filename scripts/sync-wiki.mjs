@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { copyFile, lstat, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { mkdir, open, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -58,7 +59,7 @@ function rewriteLinks(content, sourcePath, sourceRoot, repository, branch, pageN
 
 function sidebarLink(sourcePath, heading, page) {
   const title = heading ?? page.replace(/^MCP-/, '').replace(/\.md$/, '').replaceAll('-', ' ')
-  const label = title.replace(/&/g, '&amp;').replace(/\[/g, '\\[').replace(/\]/g, '\\]')
+  const label = title.replace(/&/g, '&amp;').replace(/[\\[\]]/g, '\\$&')
   return `- [${label}](${page.slice(0, -3)})`
 }
 
@@ -97,10 +98,41 @@ export async function buildWikiPages(sourceRoot, outputRoot, { repository, branc
   await writeFile(resolve(outputRoot, '_Sidebar.md'), `${sidebar}\n`)
 }
 
+async function openRegularFile(path, flags) {
+  let handle
+  try {
+    handle = await open(path, flags | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+  } catch (error) {
+    if (error.code === 'ELOOP') throw new Error(`Refusing to use a non-file GitHub Wiki entry: ${path}`, { cause: error })
+    throw error
+  }
+  try {
+    const metadata = await handle.stat()
+    if (!metadata.isFile()) throw new Error(`Refusing to use a non-file GitHub Wiki entry: ${path}`)
+    return handle
+  } catch (error) {
+    await handle.close()
+    throw error
+  }
+}
+
 async function readRegularFile(path) {
-  const metadata = await lstat(path)
-  if (!metadata.isFile()) throw new Error(`Refusing to use a non-file GitHub Wiki entry: ${path}`)
-  return readFile(path)
+  const handle = await openRegularFile(path, constants.O_RDONLY)
+  try {
+    return await handle.readFile()
+  } finally {
+    await handle.close()
+  }
+}
+
+async function writeRegularFile(path, content) {
+  const handle = await openRegularFile(path, constants.O_WRONLY | constants.O_CREAT)
+  try {
+    await handle.truncate(0)
+    await handle.writeFile(content)
+  } finally {
+    await handle.close()
+  }
 }
 
 export async function syncWikiPages(generatedRoot, wikiRoot) {
@@ -144,10 +176,10 @@ export async function syncWikiPages(generatedRoot, wikiRoot) {
     if (existing && !previousSet.has(file) && file !== 'Home.md' && file !== '_Sidebar.md' && !existing.equals(generated)) {
       throw new Error(`Refusing to overwrite an unmanaged GitHub Wiki page: ${file}`)
     }
-    await copyFile(resolve(generatedRoot, file), destination)
+    await writeRegularFile(destination, generated)
   }
 
-  await writeFile(resolve(wikiRoot, managedManifest), `${generatedFiles.join('\n')}\n`)
+  await writeRegularFile(resolve(wikiRoot, managedManifest), `${generatedFiles.join('\n')}\n`)
 }
 
 async function main(args) {

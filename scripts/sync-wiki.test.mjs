@@ -31,8 +31,28 @@ test('builds flat GitHub Wiki pages and rewrites internal and repository links',
 
     assert.match(await readFile(resolve(generated, 'Home.md'), 'utf8'), /]\(MCP-Users-Getting-Started\)/)
     assert.match(await readFile(resolve(generated, 'MCP-Users-Getting-Started.md'), 'utf8'), /]\(MCP-Developers-Overview\)/)
-    assert.match(await readFile(resolve(generated, 'MCP-Developers-Overview.md'), 'utf8'), /https:\/\/github\.com\/owner\/repo\/blob\/main\/CONTRIBUTING\.md/)
+    assert.equal(
+      await readFile(resolve(generated, 'MCP-Developers-Overview.md'), 'utf8'),
+      '# Overview\n\n[Contributing](https://github.com/owner/repo/blob/main/CONTRIBUTING.md)\n'
+    )
     assert.match(await readFile(resolve(generated, '_Sidebar.md'), 'utf8'), /]\(MCP-Users-Getting-Started\)/)
+  })
+})
+
+test('escapes backslashes and brackets in sidebar link labels', async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const source = resolve(directory, 'wiki')
+    const generated = resolve(directory, 'generated')
+    await mkdir(resolve(source, 'users'), { recursive: true })
+    await writeFile(resolve(source, 'README.md'), '# Wiki\n')
+    await writeFile(resolve(source, 'users/guide.md'), '# Paths \\ [setup] & permissions\n')
+
+    await buildWikiPages(source, generated, { repository: 'owner/repo' })
+
+    assert.equal(
+      await readFile(resolve(generated, '_Sidebar.md'), 'utf8'),
+      '### For users\n\n- [Paths \\\\ \\[setup\\] &amp; permissions](MCP-Users-Guide)\n'
+    )
   })
 })
 
@@ -54,6 +74,7 @@ test('syncs managed pages, preserves unrelated pages, and prunes only stale mana
     await writeFile(resolve(generated, 'Home.md'), 'Generated home\n')
     await writeFile(resolve(generated, '_Sidebar.md'), 'Generated sidebar\n')
     await writeFile(resolve(generated, 'MCP-Users-New-Guide.md'), 'New guide\n')
+    await writeFile(resolve(wiki, 'Home.md'), 'Previous home content that is longer than the new home\n')
     await writeFile(resolve(wiki, 'MCP-Users-Old-Guide.md'), 'Old managed page\n')
     await writeFile(resolve(wiki, 'Custom-Page.md'), 'Keep this page\n')
     await writeFile(resolve(wiki, '.sdlc-mcp-managed-pages'), 'MCP-Users-Old-Guide.md\n')
@@ -64,6 +85,9 @@ test('syncs managed pages, preserves unrelated pages, and prunes only stale mana
     assert.equal(await readFile(resolve(wiki, 'Custom-Page.md'), 'utf8'), 'Keep this page\n')
     await assert.rejects(readFile(resolve(wiki, 'MCP-Users-Old-Guide.md')), { code: 'ENOENT' })
     assert.match(await readFile(resolve(wiki, '.sdlc-mcp-managed-pages'), 'utf8'), /MCP-Users-New-Guide\.md/)
+
+    await syncWikiPages(generated, wiki)
+    assert.equal(await readFile(resolve(wiki, 'Home.md'), 'utf8'), 'Generated home\n')
   })
 })
 
@@ -98,5 +122,23 @@ test('refuses to follow a symlink from the GitHub Wiki repository', async () => 
 
     await assert.rejects(syncWikiPages(generated, wiki), /Refusing to use a non-file GitHub Wiki entry/)
     assert.equal(await readFile(protectedFile, 'utf8'), 'Keep this file unchanged\n')
+  })
+})
+
+test('refuses a symlinked managed-page manifest', async () => {
+  await withTemporaryDirectory(async (directory) => {
+    const generated = resolve(directory, 'generated')
+    const wiki = resolve(directory, 'wiki-repository')
+    const protectedFile = resolve(directory, 'protected-manifest')
+    await mkdir(generated)
+    await mkdir(wiki)
+    await writeFile(resolve(generated, 'Home.md'), 'Generated home\n')
+    await writeFile(resolve(generated, '_Sidebar.md'), 'Generated sidebar\n')
+    await writeFile(protectedFile, 'Home.md\n_Sidebar.md\n')
+    await symlink(protectedFile, resolve(wiki, '.sdlc-mcp-managed-pages'))
+
+    await assert.rejects(syncWikiPages(generated, wiki), /Refusing to use a non-file GitHub Wiki entry/)
+    assert.equal(await readFile(protectedFile, 'utf8'), 'Home.md\n_Sidebar.md\n')
+    await assert.rejects(readFile(resolve(wiki, 'Home.md')), { code: 'ENOENT' })
   })
 })
