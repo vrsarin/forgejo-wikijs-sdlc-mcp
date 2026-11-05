@@ -278,10 +278,9 @@ test('removes stale orphaned API entries returning registry 404 but never retain
   )
   versions[8].metadata.container.tags = []
   versions[8].created_at = new Date(now).toISOString()
-  await assert.rejects(
-    planManifestRetention(versions, planPackageRetention(versions), readWithMissing, now),
-    /manifest .* failed \(404\)/
-  )
+  const recentPlan = await planManifestRetention(versions, planPackageRetention(versions), readWithMissing, now)
+  assert.ok(recentPlan.protected.some((item) => item.id === 9))
+  assert.equal(recentPlan.delete.some((item) => item.id === 9), false)
 })
 
 test('protects recent uploads and their dependencies until the 24-hour grace period ends', async () => {

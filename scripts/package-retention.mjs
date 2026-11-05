@@ -303,17 +303,24 @@ export async function planManifestRetention(versions, plan, readManifest, now = 
     if (now - created < manifestGracePeriod) recent.add(version.id)
   }
   const reachable = new Set()
-  const visit = [
+  const retainedRoots = [
     ...plan.keep,
-    ...plan.protected.filter((item) => !isAuxiliaryVersion(byId.get(item.id)) || recent.has(item.id))
+    ...plan.protected.filter((item) => !isAuxiliaryVersion(byId.get(item.id)))
   ].map((item) => byId.get(item.id).name)
-  while (visit.length) {
-    const digest = visit.pop()
-    if (reachable.has(digest)) continue
-    if (!manifests.has(digest)) await loadManifests([digest])
-    if (manifests.get(digest) === null) throw new RegistryManifestError(digest, 404)
-    reachable.add(digest)
-    visit.push(...manifests.get(digest), ...(attachments.get(digest) ?? []))
+  const recentRoots = versions.filter((version) => recent.has(version.id)).map((version) => version.name)
+  for (const [visit, required] of [[retainedRoots, true], [recentRoots, false]]) {
+    while (visit.length) {
+      const digest = visit.pop()
+      if (reachable.has(digest)) continue
+      if (!manifests.has(digest)) await loadManifests([digest])
+      const dependencies = manifests.get(digest)
+      if (dependencies === null) {
+        if (required) throw new RegistryManifestError(digest, 404)
+        console.warn(`Recent publication manifest is missing (404); preserving its package entry during grace period: ${digest}`)
+      }
+      reachable.add(digest)
+      visit.push(...(dependencies ?? []), ...(attachments.get(digest) ?? []))
+    }
   }
 
   const result = { keep: [...plan.keep], delete: [], protected: [] }

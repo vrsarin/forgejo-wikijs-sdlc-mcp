@@ -19,6 +19,8 @@ SHA-tagged and untagged versions that are not reachable from a retained image ar
 
 The plan uses a snapshot of package versions and registry manifests. It reads every listed version and follows additional child manifests only for retained or protected roots. An orphaned index can be removed even when an unlisted child has already disappeared. A listed version that returns registry HTTP 404 can be removed only if it is not retained, recently uploaded, or referenced by a protected root. A registry 404 alone is not proof that a version is orphaned. Other registry errors, unreadable required dependencies, and unsupported manifest formats stop cleanup before deletion.
 
+If a manifest protected only by the publication grace period returns HTTP 404, cleanup logs a warning and preserves its package entry. Missing dependencies of retained releases or unknown-tagged images still stop cleanup before deletion.
+
 Cleanup deletes obsolete release versions before orphaned manifests. If a release-version deletion fails, cleanup stops before deleting orphan candidates that the failed version might still need.
 
 ## Prerequisite
