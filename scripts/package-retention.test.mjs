@@ -206,6 +206,35 @@ test('deletes orphaned SHA and untagged versions but preserves the complete reta
   assert.deepEqual(plan.protected.map((item) => item.id).sort((a, b) => a - b), [3, 5, 7, 10, 11])
 })
 
+test('protects tagged dependencies even when the inventory contains no auxiliary versions', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  const snapshot = versions.slice(0, 2)
+  manifests.set(digest(1), {
+    ...manifests.get(digest(1)),
+    manifests: [{ digest: digest(2) }]
+  })
+  manifests.set(digest(2), imageManifest())
+  const plan = await planManifestRetention(snapshot, planPackageRetention(snapshot), read, now)
+
+  assert.deepEqual(plan.keep.map((item) => item.id), [1])
+  assert.deepEqual(plan.protected.map((item) => item.id), [2])
+  assert.equal(plan.delete.length, 0)
+})
+
+test('preserves listed children of an unlisted OCI subject index referenced by a retained artifact', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  manifests.set(digest(1), imageManifest(digest(999)))
+  manifests.set(digest(999), {
+    schemaVersion: 2,
+    mediaType: 'application/vnd.oci.image.index.v1+json',
+    manifests: [{ digest: digest(4) }]
+  })
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+
+  assert.ok(plan.protected.some((item) => item.id === 4))
+  assert.equal(plan.delete.some((item) => item.id === 4), false)
+})
+
 test('preserves dependencies of unknown tags and multi-identity versions', async () => {
   const { versions, manifests, read, now } = manifestFixture()
   versions[8].metadata.container.tags = ['custom']
@@ -385,9 +414,12 @@ test('does not delete orphan candidates when deleting a release version fails', 
   assert.deepEqual(attempted, [2])
 })
 
-async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200 } = {}) {
+async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200, retainedChild = false } = {}) {
   const requests = []
   const versionsPath = '/users/test-owner/packages/container/test-package/versions'
+  const versions = [
+    version(1, '1.0.4'), version(2, '1.0.4-dev.57.1'), version(3, '1.0.4-rc.59.1')
+  ].map((item) => ({ ...item, name: digest(item.id) }))
   const server = createServer((request, response) => {
     requests.push(`${request.method} ${request.url}`)
     response.setHeader('Content-Type', 'application/json')
@@ -396,8 +428,17 @@ async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200 } = {
     } else if (request.method === 'GET' && request.url === `${versionsPath}?per_page=100&page=1`) {
       response.statusCode = getStatus
       response.end(JSON.stringify(getStatus === 200
-        ? [version(1, '1.0.4'), version(2, '1.0.4-dev.57.1'), version(3, '1.0.4-rc.59.1')]
+        ? versions
         : { message: 'Cannot list package versions' }))
+    } else if (request.method === 'GET' && request.url.startsWith('/token?')) {
+      response.end(JSON.stringify({ token: 'test-registry-token' }))
+    } else if (request.method === 'GET' &&
+      versions.some((item) => request.url === `/v2/test-owner/test-package/manifests/${item.name}`)) {
+      response.end(JSON.stringify(retainedChild && request.url.endsWith(digest(1)) ? {
+        schemaVersion: 2,
+        mediaType: 'application/vnd.oci.image.index.v1+json',
+        manifests: [{ digest: digest(2) }]
+      } : imageManifest()))
     } else if (request.method === 'DELETE' && [`${versionsPath}/2`, `${versionsPath}/3`].includes(request.url)) {
       response.statusCode = deleteStatus(request.url)
       response.end(response.statusCode === 204 ? undefined : JSON.stringify({ message: 'Delete response' }))
@@ -415,6 +456,16 @@ async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200 } = {
   return {
     requests,
     run: () => promisify(execFile)(process.execPath, [
+      '--import',
+      `data:text/javascript,${encodeURIComponent(`
+        const originalFetch = globalThis.fetch
+        globalThis.fetch = (input, options) => {
+          const url = new URL(input)
+          return originalFetch(url.hostname === 'ghcr.io'
+            ? process.env.GITHUB_API_URL + url.pathname + url.search
+            : input, options)
+        }
+      `)}`,
       fileURLToPath(new URL('./package-retention.mjs', import.meta.url)),
       '--apply'
     ], {
@@ -430,6 +481,18 @@ async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200 } = {
     })
   }
 }
+
+test('CLI never deletes a prerelease manifest referenced by the retained stable image', async (t) => {
+  const api = await retentionApi(t, { retainedChild: true })
+  const { stdout, stderr } = await api.run()
+
+  assert.equal(stderr, '')
+  assert.match(stdout, /referenced by a retained image/)
+  assert.deepEqual(api.requests.filter((request) => request.startsWith('DELETE ')), [
+    'DELETE /users/test-owner/packages/container/test-package/versions/3'
+  ])
+  assert.ok(api.requests.some((request) => request.startsWith('GET /v2/')))
+})
 
 test('overlapping cleanup runs succeed when a version has already been deleted', async (t) => {
   const removed = new Set()

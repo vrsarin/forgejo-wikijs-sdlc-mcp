@@ -230,9 +230,7 @@ export function registryManifestReader(owner, packageName, token, fetchRegistry 
 }
 
 export async function planManifestRetention(versions, plan, readManifest, now = Date.now()) {
-  if (!versions.some(isAuxiliaryVersion)) return plan
   const byId = new Map(versions.map((version) => [version.id, version]))
-  const versionDigests = new Set(versions.map((version) => version.name))
   const manifests = new Map()
   const attachments = new Map()
   const pending = new Set()
@@ -285,7 +283,7 @@ export async function planManifestRetention(versions, plan, readManifest, now = 
       if (manifest.subject) {
         const subject = requireDigest(manifest.subject.digest)
         attach(subject, digest)
-        if (versionDigests.has(subject)) dependencies.push(subject)
+        dependencies.push(subject)
       }
       manifests.set(digest, dependencies)
     }
