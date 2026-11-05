@@ -53,6 +53,18 @@ The scheduled workflow applies the policy hourly at 30 minutes past the hour (UT
 
 Cleanup runs can overlap across branches or workflows. If another run already deleted a selected version, a deletion response of HTTP 404 is logged as already absent and succeeds. Other API errors still fail cleanup; a 404 while listing package versions is also fatal.
 
+## Remove recent orphans in a one-off cleanup
+
+> **Warning:** Bypassing upload grace can remove manifests from an unfinished publication. Stop all image publications before using this option. Confirm that no deployment uses orphaned digests directly. Retained-image dependencies remain protected.
+
+1. Stop or wait for all image publications.
+2. Run **Package retention** with **Bypass upload grace for orphan cleanup** enabled and deletion disabled.
+3. Review every proposed deletion in the preview.
+4. Run the workflow again with both options enabled.
+5. Run another preview with the bypass enabled and confirm that no eligible orphans remain.
+
+The bypass applies only to the selected manual run. Scheduled and publication cleanup retain the normal one-hour grace period.
+
 ## Prerelease tags remain after a stable release
 
 A branch that still uses the released `VERSION` can publish new development, beta, or release-candidate tags after the stable release cleanup. Retention removes these tags at the end of each successful publication, even when their creation date is newer than the stable image.

@@ -229,7 +229,7 @@ export function registryManifestReader(owner, packageName, token, fetchRegistry 
   }
 }
 
-export async function planManifestRetention(versions, plan, readManifest, now = Date.now()) {
+export async function planManifestRetention(versions, plan, readManifest, now = Date.now(), ignoreGrace = false) {
   const byId = new Map(versions.map((version) => [version.id, version]))
   const manifests = new Map()
   const attachments = new Map()
@@ -298,7 +298,7 @@ export async function planManifestRetention(versions, plan, readManifest, now = 
   for (const version of versions.filter(isAuxiliaryVersion)) {
     const created = Date.parse(version.created_at)
     if (!Number.isFinite(created)) throw new Error(`Invalid creation date for package version ${version.id}`)
-    if (now - created < manifestGracePeriod) recent.add(version.id)
+    if (!ignoreGrace && now - created < manifestGracePeriod) recent.add(version.id)
   }
   const reachable = new Set()
   const requiredReachable = new Set()
@@ -340,7 +340,13 @@ export async function planManifestRetention(versions, plan, readManifest, now = 
             : 'dependency of a manifest within the 1-hour publication grace period'
       })
     } else if (isAuxiliaryVersion(version)) {
-      result.delete.push({ ...item, disposition: 'delete', reason: 'orphaned SHA or untagged manifest at least 1 hour old' })
+      result.delete.push({
+        ...item,
+        disposition: 'delete',
+        reason: ignoreGrace
+          ? 'orphaned SHA or untagged manifest; upload grace explicitly bypassed'
+          : 'orphaned SHA or untagged manifest at least 1 hour old'
+      })
     } else if (item.disposition === 'delete') {
       result.delete.push(item)
     } else {
@@ -436,15 +442,23 @@ async function main() {
   const owner = requiredEnvironment('PACKAGE_OWNER')
   const packageName = process.env.PACKAGE_NAME?.trim() || 'sdlc-mcp-server'
   const apply = process.argv.includes('--apply') || process.env.RETENTION_APPLY === 'true'
+  const ignoreGrace = process.env.RETENTION_IGNORE_GRACE === 'true'
+  if (ignoreGrace && process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch') {
+    throw new Error('Bypassing upload grace requires a manual workflow_dispatch run')
+  }
   const request = apiClient(token)
   const scope = await packageScope(request, owner)
   const versions = await listPackageVersions(request, scope, owner, packageName)
   const plan = await planManifestRetention(
     versions,
     planPackageRetention(versions),
-    registryManifestReader(owner, packageName, token)
+    registryManifestReader(owner, packageName, token),
+    Date.now(),
+    ignoreGrace
   )
-  const report = summary(plan, apply)
+  const report = summary(plan, apply) + (ignoreGrace
+    ? '\nWarning: Upload grace is explicitly bypassed for this manual run. Retained-image dependencies remain protected.\n'
+    : '')
   process.stdout.write(report)
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, report)
 

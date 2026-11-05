@@ -9,6 +9,10 @@ on:
         description: Delete versions selected by the retention plan
         type: boolean
         default: false
+      ignore_grace:
+        description: Bypass upload grace for orphan cleanup (stop publications first)
+        type: boolean
+        default: false
 
 concurrency:
   group: package-retention
@@ -37,4 +41,5 @@ jobs:
           PACKAGE_NAME: sdlc-mcp-server
           PACKAGE_OWNER: ${{ github.repository_owner }}
           RETENTION_APPLY: ${{ github.event_name == 'schedule' || inputs.apply }}
+          RETENTION_IGNORE_GRACE: ${{ github.event_name == 'workflow_dispatch' && inputs.ignore_grace }}
         run: node scripts/package-retention.mjs
