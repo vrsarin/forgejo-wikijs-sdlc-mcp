@@ -346,6 +346,64 @@ test('recent attestations cannot revive prereleases superseded by a stable relea
   assert.equal(shared.delete.some((item) => item.id === 2), false)
 })
 
+for (const stage of ['dev', 'beta', 'rc']) {
+  test(`cleanup lifecycle removes superseded ${stage} tags, expires orphan attestations, and is idempotent`, async () => {
+    const fixture = manifestFixture()
+    let inventory = fixture.versions
+    inventory[1].metadata.container.tags = [`1.0.4-${stage}.42.1`]
+    inventory[1].created_at = new Date(fixture.now).toISOString()
+    inventory[5].created_at = new Date(fixture.now).toISOString()
+    fixture.manifests.set(digest(6), imageManifest(digest(2)))
+    const missing = registryManifestReader('owner', 'package', 'test-token', async (url) =>
+      new URL(url).pathname === '/token'
+        ? new Response(JSON.stringify({ token: 'registry-token' }))
+        : new Response('', { status: 404 }))
+    const read = async (name) => fixture.manifests.has(name)
+      ? fixture.manifests.get(name)
+      : missing(name)
+    const cleanup = async (now) => {
+      const plan = await planManifestRetention(inventory, planPackageRetention(inventory), read, now)
+      await applyRetentionPlan(plan, async (item) => {
+        inventory = inventory.filter((version) => version.id !== item.id)
+        fixture.manifests.delete(item.digest)
+      })
+      return plan
+    }
+
+    const initial = await cleanup(fixture.now)
+    assert.ok(initial.delete.some((item) => item.id === 2))
+    assert.ok(initial.protected.some((item) => item.id === 6))
+    assert.equal(inventory.some((item) => item.id === 2), false)
+
+    await cleanup(fixture.now)
+    const expired = await cleanup(fixture.now + 60 * 60 * 1000)
+    assert.ok(expired.delete.some((item) => item.id === 6))
+    assert.deepEqual(inventory.map((item) => item.id), [1, 3, 5, 7, 10, 11])
+
+    const repeated = await cleanup(fixture.now + 60 * 60 * 1000)
+    assert.equal(repeated.delete.length, 0)
+    assert.deepEqual(repeated.keep.map((item) => item.id), [1])
+    assert.deepEqual(repeated.protected.map((item) => item.id), [3, 5, 7, 10, 11])
+  })
+}
+
+test('dependency protection is independent of package listing order', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  versions[5].created_at = new Date(now).toISOString()
+  manifests.set(digest(6), imageManifest(digest(2)))
+  const expected = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+  for (let offset = 0; offset < versions.length; offset += 1) {
+    const reordered = [...versions.slice(offset), ...versions.slice(0, offset)].reverse()
+    const actual = await planManifestRetention(reordered, planPackageRetention(reordered), read, now)
+    for (const disposition of ['keep', 'delete', 'protected']) {
+      assert.deepEqual(
+        actual[disposition].map((item) => item.id).sort((a, b) => a - b),
+        expected[disposition].map((item) => item.id).sort((a, b) => a - b)
+      )
+    }
+  }
+})
+
 test('schedules automatic orphan cleanup every hour', () => {
   const workflow = readFileSync(
     new URL('../.github/workflows/package-retention.yml', import.meta.url), 'utf8'
