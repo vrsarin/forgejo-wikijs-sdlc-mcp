@@ -2,22 +2,6 @@ name: Container images
 
 on:
   pull_request:
-    paths:
-      - ".github/workflows/container-images.yml"
-      - ".github/actions/setup-pinned-trivy/action.yml"
-      - ".github/dependabot.yml"
-      - "Dockerfile.dockerignore"
-      - "VERSION"
-      - "scripts/resolve-image-version.mjs"
-      - "Dockerfile"
-      - "package.json"
-      - "package-lock.json"
-      - "tsconfig.json"
-      - "src/index.ts"
-      - "src/core/**"
-      - "src/providers/forgejo/**"
-      - "src/providers/wikijs/**"
-      - "src/providers/homeassistant/**"
   push:
     branches: ["**", "!dependabot/**"]
     paths:
