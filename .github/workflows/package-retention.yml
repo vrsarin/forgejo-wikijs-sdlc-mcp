@@ -2,7 +2,7 @@ name: Package retention
 
 on:
   schedule:
-    - cron: "30 4 * * 1"
+    - cron: "30 * * * *"
   workflow_dispatch:
     inputs:
       apply:

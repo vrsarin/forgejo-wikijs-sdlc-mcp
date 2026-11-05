@@ -312,21 +312,29 @@ test('removes stale orphaned API entries returning registry 404 but never retain
   assert.equal(recentPlan.delete.some((item) => item.id === 9), false)
 })
 
-test('protects recent uploads and their dependencies until the 24-hour grace period ends', async () => {
+test('protects recent uploads and their dependencies until the 1-hour grace period ends', async () => {
   const { versions, manifests, read, now } = manifestFixture()
-  versions[5].created_at = new Date(now - 60_000).toISOString()
+  versions[5].created_at = new Date(now - 60 * 60 * 1000 + 1).toISOString()
   manifests.set(digest(6), {
     ...manifests.get(digest(1)),
     manifests: [{ digest: digest(8) }]
   })
   const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
-  assert.match(plan.protected.find((item) => item.id === 6).reason, /24-hour/)
+  assert.match(plan.protected.find((item) => item.id === 6).reason, /1-hour/)
   assert.ok(plan.protected.some((item) => item.id === 8))
 
   const expired = await planManifestRetention(
-    versions, planPackageRetention(versions), read, now + 24 * 60 * 60 * 1000
+    versions, planPackageRetention(versions), read, now + 1
   )
   for (const id of [6, 8]) assert.ok(expired.delete.some((item) => item.id === id))
+})
+
+test('schedules automatic orphan cleanup every hour', () => {
+  const workflow = readFileSync(
+    new URL('../.github/workflows/package-retention.yml', import.meta.url), 'utf8'
+  )
+  assert.match(workflow, /cron: "30 \* \* \* \*"/)
+  assert.match(workflow, /RETENTION_APPLY:.*github\.event_name == 'schedule'/)
 })
 
 test('manifest lookup failures abort planning rather than treating unreadable manifests as orphans', async () => {

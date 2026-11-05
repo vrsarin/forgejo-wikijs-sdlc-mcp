@@ -8,7 +8,7 @@ const stablePattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
 const prereleasePattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-(dev|beta|rc)\.([1-9]\d*)\.([1-9]\d*)$/
 const digestPattern = /^sha256:[a-f0-9]{64}$/
 const digestTagPattern = /^sha256-([a-f0-9]{64})(?:\.(?:sig|att))?$/
-const manifestGracePeriod = 24 * 60 * 60 * 1000
+const manifestGracePeriod = 60 * 60 * 1000
 
 export const defaultRetention = Object.freeze({
   stable: 5,
@@ -329,11 +329,11 @@ export async function planManifestRetention(versions, plan, readManifest, now = 
         ...item,
         disposition: 'protected',
         reason: recent.has(version.id)
-          ? 'manifest is within the 24-hour publication grace period'
+          ? 'manifest is within the 1-hour publication grace period'
           : 'referenced by a retained image or protected manifest'
       })
     } else if (isAuxiliaryVersion(version)) {
-      result.delete.push({ ...item, disposition: 'delete', reason: 'orphaned SHA or untagged manifest older than 24 hours' })
+      result.delete.push({ ...item, disposition: 'delete', reason: 'orphaned SHA or untagged manifest at least 1 hour old' })
     } else if (item.disposition === 'delete') {
       result.delete.push(item)
     } else {
