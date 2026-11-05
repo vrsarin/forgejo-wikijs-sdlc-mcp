@@ -11,7 +11,7 @@ The policy keeps:
 - two beta versions for each active semantic version;
 - one release-candidate version for each active semantic version.
 
-When a stable version exists, the workflow removes every development, beta, and release-candidate version with the same semantic-version base. Each base version is evaluated separately so parallel release trains do not consume each other's quotas.
+When a stable version exists, the workflow removes every development, beta, and release-candidate version at or below the newest stable semantic version. It keeps prereleases for versions newer than the latest stable release. Each remaining base version is evaluated separately so parallel release trains do not consume each other's quotas.
 
 The workflow protects untagged versions, unknown tags, and versions that contain multiple release identities.
 

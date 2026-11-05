@@ -51,6 +51,23 @@ test('keeps five stable releases and purges prereleases after their stable relea
   assert.equal(plan.keep.some((item) => item.tags.includes('1.10.0')), true)
 })
 
+test('purges older prerelease trains after a newer stable release', () => {
+  const versions = [
+    version(1, '1.0.3'),
+    version(2, '1.0.1-dev.13.1'),
+    version(3, '1.0.2-beta.42.1'),
+    version(4, '1.0.2-rc.46.1'),
+    version(5, '1.0.4-dev.47.1')
+  ]
+  const plan = planPackageRetention(versions)
+  const deletedTags = new Set(plan.delete.flatMap((item) => item.tags))
+
+  assert.equal(deletedTags.has('1.0.1-dev.13.1'), true)
+  assert.equal(deletedTags.has('1.0.2-beta.42.1'), true)
+  assert.equal(deletedTags.has('1.0.2-rc.46.1'), true)
+  assert.equal(plan.keep.some((item) => item.tags.includes('1.0.4-dev.47.1')), true)
+})
+
 test('applies stage quotas independently to parallel release trains', () => {
   const versions = []
   let id = 1
