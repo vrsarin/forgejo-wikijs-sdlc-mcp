@@ -183,6 +183,13 @@ function isAuxiliaryTags(tags) {
   return tags.length === 0 || tags.every((tag) => digestTagPattern.test(tag))
 }
 
+class RegistryManifestError extends Error {
+  constructor(digest, status) {
+    super(`GHCR manifest ${digest} failed (${status})`)
+    this.status = status
+  }
+}
+
 export function registryManifestReader(owner, packageName, token, fetchRegistry = fetch) {
   const repository = `${owner}/${packageName}`.toLowerCase()
   const manifestPath = repository.split('/').map(encodeURIComponent).join('/')
@@ -217,7 +224,7 @@ export function registryManifestReader(owner, packageName, token, fetchRegistry 
       },
       redirect: 'error'
     })
-    if (!response.ok) throw new Error(`GHCR manifest ${digest} failed (${response.status})`)
+    if (!response.ok) throw new RegistryManifestError(digest, response.status)
     return response.json()
   }
 }
@@ -247,8 +254,20 @@ export async function planManifestRetention(versions, plan, readManifest, now = 
     }
   }
   const loadManifests = async (batch) => {
-    const loaded = await Promise.all(batch.map(async (digest) => [digest, await readManifest(digest)]))
+    const loaded = await Promise.all(batch.map(async (digest) => {
+      try {
+        return [digest, await readManifest(digest)]
+      } catch (error) {
+        if (!(error instanceof RegistryManifestError) || error.status !== 404) throw error
+        console.log(`Registry manifest is unavailable (404); checking retained references: ${digest}`)
+        return [digest, null]
+      }
+    }))
     for (const [digest, manifest] of loaded) {
+      if (manifest === null) {
+        manifests.set(digest, null)
+        continue
+      }
       const isIndex = [
         'application/vnd.oci.image.index.v1+json',
         'application/vnd.docker.distribution.manifest.list.v2+json'
@@ -292,6 +311,7 @@ export async function planManifestRetention(versions, plan, readManifest, now = 
     const digest = visit.pop()
     if (reachable.has(digest)) continue
     if (!manifests.has(digest)) await loadManifests([digest])
+    if (manifests.get(digest) === null) throw new RegistryManifestError(digest, 404)
     reachable.add(digest)
     visit.push(...manifests.get(digest), ...(attachments.get(digest) ?? []))
   }

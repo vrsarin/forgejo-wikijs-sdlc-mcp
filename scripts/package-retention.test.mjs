@@ -261,6 +261,29 @@ test('does not fetch missing children of an orphaned index but fails for missing
   )
 })
 
+test('removes stale orphaned API entries returning registry 404 but never retained or recent entries', async () => {
+  const { versions, read, now } = manifestFixture()
+  const missing = registryManifestReader('owner', 'package', 'test-token', async (url) =>
+    new URL(url).pathname === '/token'
+      ? new Response(JSON.stringify({ token: 'registry-token' }))
+      : new Response('', { status: 404 }))
+  const readWithMissing = async (name) => name === digest(9) ? missing(name) : read(name)
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), readWithMissing, now)
+  assert.ok(plan.delete.some((item) => item.id === 9))
+
+  versions[8].metadata.container.tags = ['custom']
+  await assert.rejects(
+    planManifestRetention(versions, planPackageRetention(versions), readWithMissing, now),
+    /manifest .* failed \(404\)/
+  )
+  versions[8].metadata.container.tags = []
+  versions[8].created_at = new Date(now).toISOString()
+  await assert.rejects(
+    planManifestRetention(versions, planPackageRetention(versions), readWithMissing, now),
+    /manifest .* failed \(404\)/
+  )
+})
+
 test('protects recent uploads and their dependencies until the 24-hour grace period ends', async () => {
   const { versions, manifests, read, now } = manifestFixture()
   versions[5].created_at = new Date(now - 60_000).toISOString()

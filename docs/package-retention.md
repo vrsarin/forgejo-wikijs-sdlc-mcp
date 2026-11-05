@@ -17,7 +17,7 @@ The workflow protects unknown tags and versions that contain multiple release id
 
 SHA-tagged and untagged versions that are not reachable from a retained image are deleted after a 24-hour grace period. Recent manifests and their dependencies remain protected so an in-progress publication can finish tagging its images. Old orphaned manifests from releases already deleted by earlier cleanup runs are eligible too.
 
-The plan uses a snapshot of package versions and registry manifests. It reads every listed version and follows additional child manifests only for retained or protected roots. An orphaned index can be removed even when an unlisted child has already disappeared. If a requested registry lookup fails or a manifest cannot be understood, cleanup fails before deleting any version. Registry read failures are not treated as proof that a manifest is orphaned.
+The plan uses a snapshot of package versions and registry manifests. It reads every listed version and follows additional child manifests only for retained or protected roots. An orphaned index can be removed even when an unlisted child has already disappeared. A listed version that returns registry HTTP 404 can be removed only if it is not retained, recently uploaded, or referenced by a protected root. A registry 404 alone is not proof that a version is orphaned. Other registry errors, unreadable required dependencies, and unsupported manifest formats stop cleanup before deletion.
 
 Cleanup deletes obsolete release versions before orphaned manifests. If a release-version deletion fails, cleanup stops before deleting orphan candidates that the failed version might still need.
 
