@@ -404,12 +404,25 @@ test('dependency protection is independent of package listing order', async () =
   }
 })
 
-test('schedules automatic orphan cleanup every hour', () => {
+test('manual bypass removes recent orphans without affecting retained dependencies or normal grace', async () => {
+  const { versions, read, now } = manifestFixture()
+  for (const item of versions) item.created_at = new Date(now).toISOString()
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now, true)
+  assert.deepEqual(plan.delete.map((item) => item.id).sort((a, b) => a - b), [2, 4, 6, 8, 9])
+  assert.deepEqual(plan.protected.map((item) => item.id).sort((a, b) => a - b), [3, 5, 7, 10, 11])
+  assert.ok(plan.delete.find((item) => item.id === 6).reason.includes('explicitly bypassed'))
+  const normal = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+  for (const id of [4, 6, 8, 9]) assert.ok(normal.protected.some((item) => item.id === id))
+})
+
+test('schedules automatic orphan cleanup every hour and restricts bypass to manual dispatch', () => {
   const workflow = readFileSync(
     new URL('../.github/workflows/package-retention.yml', import.meta.url), 'utf8'
   )
   assert.match(workflow, /cron: "30 \* \* \* \*"/)
   assert.match(workflow, /RETENTION_APPLY:.*github\.event_name == 'schedule'/)
+  assert.match(workflow, /ignore_grace:\n\s+description:.*\n\s+type: boolean\n\s+default: false/)
+  assert.match(workflow, /RETENTION_IGNORE_GRACE:.*github\.event_name == 'workflow_dispatch' && inputs\.ignore_grace/)
 })
 
 test('manifest lookup failures abort planning rather than treating unreadable manifests as orphans', async () => {
@@ -538,7 +551,7 @@ async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200, reta
 
   return {
     requests,
-    run: () => promisify(execFile)(process.execPath, [
+    run: (environment = {}) => promisify(execFile)(process.execPath, [
       '--import',
       `data:text/javascript,${encodeURIComponent(`
         const originalFetch = globalThis.fetch
@@ -559,11 +572,37 @@ async function retentionApi(t, { deleteStatus = () => 204, getStatus = 200, reta
         GITHUB_TOKEN: 'test-token',
         PACKAGE_OWNER: 'test-owner',
         PACKAGE_NAME: 'test-package',
-        GITHUB_STEP_SUMMARY: ''
+        GITHUB_STEP_SUMMARY: '',
+        RETENTION_IGNORE_GRACE: 'false',
+        ...environment
       }
     })
   }
 }
+
+test('CLI rejects a grace bypass outside manual dispatch before any API request', async (t) => {
+  const api = await retentionApi(t)
+  for (const event of ['schedule', 'push', 'pull_request', '']) {
+    await assert.rejects(api.run({
+      RETENTION_IGNORE_GRACE: 'true', GITHUB_EVENT_NAME: event
+    }), (error) => {
+      assert.equal(error.code, 1)
+      assert.match(error.stderr, /requires a manual workflow_dispatch/)
+      return true
+    })
+  }
+  assert.equal(api.requests.length, 0)
+})
+
+test('CLI accepts an explicit manual bypass and reports it', async (t) => {
+  const api = await retentionApi(t)
+  const { stdout, stderr } = await api.run({
+    RETENTION_IGNORE_GRACE: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch'
+  })
+  assert.equal(stderr, '')
+  assert.match(stdout, /Upload grace is explicitly bypassed/)
+  assert.equal(api.requests.filter((item) => item.startsWith('DELETE ')).length, 2)
+})
 
 test('CLI never deletes a prerelease manifest referenced by the retained stable image', async (t) => {
   const api = await retentionApi(t, { retainedChild: true })
