@@ -68,6 +68,8 @@ A hotfix can use an accelerated schedule, but it must retain required reviews, s
 11. Describe the changelog entry, security impact, configuration changes, and rollback considerations.
 12. Merge only after the required reviews and CI checks pass.
 
+The Container images workflow scans both image architectures and container configuration on every pull request, including documentation-only changes. Required Trivy code-scanning results must include these categories as well as the repository scan. Do not add a pull-request path filter: missing categories block merging even when the repository scan passes. Pull-request runs do not publish images; push runs retain their path filters.
+
 ### Integrate the milestone
 
 1. Use the beta image produced after the milestone change merges into the milestone branch.
