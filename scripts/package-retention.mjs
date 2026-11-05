@@ -8,7 +8,7 @@ const stablePattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
 const prereleasePattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-(dev|beta|rc)\.([1-9]\d*)\.([1-9]\d*)$/
 const digestPattern = /^sha256:[a-f0-9]{64}$/
 const digestTagPattern = /^sha256-([a-f0-9]{64})(?:\.(?:sig|att))?$/
-const manifestGracePeriod = 24 * 60 * 60 * 1000
+const manifestGracePeriod = 60 * 60 * 1000
 
 export const defaultRetention = Object.freeze({
   stable: 5,
@@ -301,6 +301,7 @@ export async function planManifestRetention(versions, plan, readManifest, now = 
     if (now - created < manifestGracePeriod) recent.add(version.id)
   }
   const reachable = new Set()
+  const requiredReachable = new Set()
   const retainedRoots = [
     ...plan.keep,
     ...plan.protected.filter((item) => !isAuxiliaryVersion(byId.get(item.id)))
@@ -317,6 +318,7 @@ export async function planManifestRetention(versions, plan, readManifest, now = 
         console.warn(`Recent publication manifest is missing (404); preserving its package entry during grace period: ${digest}`)
       }
       reachable.add(digest)
+      if (required) requiredReachable.add(digest)
       visit.push(...(dependencies ?? []), ...(attachments.get(digest) ?? []))
     }
   }
@@ -324,16 +326,21 @@ export async function planManifestRetention(versions, plan, readManifest, now = 
   const result = { keep: [...plan.keep], delete: [], protected: [] }
   for (const item of [...plan.delete, ...plan.protected]) {
     const version = byId.get(item.id)
-    if (reachable.has(version.name) || recent.has(version.id)) {
+    const referenced = isAuxiliaryVersion(version)
+      ? reachable.has(version.name)
+      : requiredReachable.has(version.name)
+    if (referenced || recent.has(version.id)) {
       result.protected.push({
         ...item,
         disposition: 'protected',
         reason: recent.has(version.id)
-          ? 'manifest is within the 24-hour publication grace period'
-          : 'referenced by a retained image or protected manifest'
+          ? 'manifest is within the 1-hour publication grace period'
+          : requiredReachable.has(version.name)
+            ? 'referenced by a retained image or protected manifest'
+            : 'dependency of a manifest within the 1-hour publication grace period'
       })
     } else if (isAuxiliaryVersion(version)) {
-      result.delete.push({ ...item, disposition: 'delete', reason: 'orphaned SHA or untagged manifest older than 24 hours' })
+      result.delete.push({ ...item, disposition: 'delete', reason: 'orphaned SHA or untagged manifest at least 1 hour old' })
     } else if (item.disposition === 'delete') {
       result.delete.push(item)
     } else {
