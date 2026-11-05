@@ -329,6 +329,23 @@ test('protects recent uploads and their dependencies until the 1-hour grace peri
   for (const id of [6, 8]) assert.ok(expired.delete.some((item) => item.id === id))
 })
 
+test('recent attestations cannot revive prereleases superseded by a stable release', async () => {
+  const { versions, manifests, read, now } = manifestFixture()
+  versions[5].created_at = new Date(now).toISOString()
+  manifests.set(digest(6), imageManifest(digest(2)))
+  const plan = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+
+  assert.ok(plan.delete.some((item) => item.id === 2))
+  assert.equal(plan.protected.some((item) => item.id === 2), false)
+  assert.ok(plan.protected.some((item) => item.id === 6))
+  assert.ok(plan.protected.some((item) => item.id === 4))
+
+  manifests.get(digest(1)).manifests.push({ digest: digest(2) })
+  const shared = await planManifestRetention(versions, planPackageRetention(versions), read, now)
+  assert.ok(shared.protected.some((item) => item.id === 2))
+  assert.equal(shared.delete.some((item) => item.id === 2), false)
+})
+
 test('schedules automatic orphan cleanup every hour', () => {
   const workflow = readFileSync(
     new URL('../.github/workflows/package-retention.yml', import.meta.url), 'utf8'
