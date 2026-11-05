@@ -38,3 +38,5 @@ The Home Assistant provider starts an HTTP handler rather than an stdio MCP serv
 - Update the relevant wiki page when configuration or user-visible behavior changes.
 
 See [Add a provider](adding-a-provider.md) for the extension outline and [Set up local development](local-development.md) to run checks.
+
+See [Publish to GitHub Wiki](publishing.md) to configure automatic publication of these pages.
