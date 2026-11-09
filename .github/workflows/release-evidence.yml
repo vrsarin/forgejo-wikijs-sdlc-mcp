@@ -24,7 +24,7 @@ jobs:
       CI_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
       CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
         with:
           egress-policy: audit
       - name: Validate the release tag
@@ -89,7 +89,7 @@ jobs:
       RELEASE_TAG: ${{ github.event.release.tag_name }}
       RUN_ID: ${{ github.run_id }}
     steps:
-      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+      - uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
         with:
           egress-policy: audit
       - name: Download verified evidence
